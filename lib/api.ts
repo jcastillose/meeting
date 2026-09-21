@@ -1,0 +1,18 @@
+import {z} from 'zod';
+import {validKeys,type Poll,type Vote} from './domain';
+import type {Store} from './store';
+const dateString=z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine(s=>{const d=new Date(s+'T12:00:00Z');return !isNaN(+d)&&d.toISOString().slice(0,10)===s;});
+const input=z.object({title:z.string().trim().min(1).max(120),mode:z.enum(['dates','week','month']),start:dateString,end:dateString,from:z.number().int().min(0).max(1410),to:z.number().int().min(30).max(1440),step:z.union([z.literal(30),z.literal(60)]),timezone:z.string().max(80).refine(t=>{try{new Intl.DateTimeFormat('en',{timeZone:t});return true;}catch{return false;}})}).refine(p=>p.end>=p.start&&(+new Date(p.end)-+new Date(p.start))/86400000<=61&&p.to>p.from&&(p.to-p.from)%p.step===0&&p.from%p.step===0);
+const voteInput=z.object({token:z.string().regex(/^[a-f0-9]{64}$/),name:z.string().trim().min(1).max(80),comment:z.string().trim().max(1000),slots:z.record(z.enum(['yes','maybe','no'])).refine(s=>Object.keys(s).length>0&&Object.keys(s).length<=3000)});
+const headers={'Cache-Control':'no-store','X-Content-Type-Options':'nosniff'};
+const json=(d:unknown,status=200)=>Response.json(d,{status,headers});
+async function hash(s:string){return Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(s))),b=>b.toString(16).padStart(2,'0')).join('');}
+export async function handle(request:Request,store:Store,id?:string):Promise<Response>{try{
+if(request.method!=='GET'){const origin=request.headers.get('origin');if(origin&&origin!==new URL(request.url).origin)return json({error:'Origen no permitido.'},403);if(!request.headers.get('content-type')?.includes('application/json'))return json({error:'Formato no permitido.'},415);}
+if(id&&!/^p_[a-f0-9]{32}$/.test(id))return json({error:'No encontramos esta consulta.'},404);
+if(request.method==='GET'&&id){const poll=await store.getPoll(id);if(!poll)return json({error:'No encontramos esta consulta. Revisa el enlace.'},404);return json({poll,votes:await store.getVotes(id)});}
+const raw=await request.text();if(raw.length>200000)return json({error:'La respuesta es demasiado grande.'},413);let body;try{body=JSON.parse(raw);}catch{return json({error:'Revisa los datos enviados.'},400);}
+if(request.method==='POST'&&!id){const p=input.parse(body);const poll:Poll={...p,id:'p_'+crypto.randomUUID().replaceAll('-',''),created:new Date().toISOString()};await store.createPoll(poll);return json({poll,votes:[]},201);}
+if(request.method==='PUT'&&id){const p=voteInput.parse(body);const poll=await store.getPoll(id);if(!poll)return json({error:'No encontramos esta consulta.'},404);const valid=validKeys(poll);if(Object.keys(p.slots).some(k=>!valid.has(k)))return json({error:'Hay horarios fuera del rango de esta consulta.'},400);const editHash=await hash(p.token);const voteId=await hash(id+':'+p.token);const prev=await store.getVote(voteId);if(prev&&(prev.edit_hash!==editHash||prev.poll_id!==id))return json({error:'No puedes editar esta respuesta.'},403);if(!prev&&(await store.getVotes(id)).length>=200)return json({error:'Esta consulta alcanzó 200 respuestas.'},409);const vote:Vote={id:voteId,name:p.name,comment:p.comment,slots:p.slots};await store.saveVote({id:voteId,poll_id:id,edit_hash:editHash,data:JSON.stringify(vote)});return json({vote});}
+return json({error:'Operación no disponible.'},405);
+}catch(e){if(e instanceof z.ZodError)return json({error:'Revisa el nombre, las fechas y los horarios. El rango máximo es de 62 días.'},400);console.error('Encuentro storage error',e);return json({error:'No se pudo acceder a las respuestas. Inténtalo nuevamente; tus cambios siguen en pantalla.'},503);}}

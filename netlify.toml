@@ -1,0 +1,10 @@
+[build]
+command = "npx vite build --config vite.netlify.ts"
+publish = "dist-netlify"
+[functions]
+directory = "netlify/functions"
+node_bundler = "esbuild"
+[[redirects]]
+from = "/*"
+to = "/index.html"
+status = 200
