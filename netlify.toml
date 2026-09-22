@@ -1,6 +1,9 @@
 [build]
 command = "npx vite build --config vite.netlify.ts"
 publish = "dist-netlify"
+[build.environment]
+# This deployment uses Vite and Netlify Functions, not the Next.js runtime.
+NETLIFY_NEXT_PLUGIN_SKIP = "true"
 [functions]
 directory = "netlify/functions"
 node_bundler = "esbuild"
