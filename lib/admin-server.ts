@@ -87,6 +87,13 @@ export function adminHandler(url:string,key:string,fetcher:typeof fetch=fetch){
         const search=z.string().max(120).parse(current.searchParams.get('search')||'');
         return reply(await rest('rpc/meeting_history','POST',{p_offset:offset,p_search:search}));
       }
+      if(path==='delete-poll'&&request.method==='POST'){
+        const parsed=z.object({id:z.string().regex(/^p_[a-f0-9]{32}$/)}).safeParse(body);
+        if(!parsed.success)throw new HttpError(400,'El identificador de la consulta no es válido.');
+        const deleted=await rest('rpc/meeting_delete_poll','POST',{p_id:parsed.data.id});
+        if(!deleted)throw new HttpError(404,'La consulta ya no existe. Actualiza el historial.');
+        return reply({ok:true});
+      }
       if(path==='invitations'&&request.method==='POST'){
         const {email}=credentials.pick({email:true}).parse(body),token=secret();
         await rest('meeting_admin_invitations','POST',{token_hash:await digest(token),email,created_by:user.id});

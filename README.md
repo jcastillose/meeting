@@ -37,3 +37,5 @@ Las sesiones duran ocho horas y usan cookies HttpOnly, Secure en HTTPS y SameSit
 Los enlaces compartidos usan `/r/titulo~codigo`. El código codifica el identificador aleatorio completo de 128 bits, de modo que títulos iguales no colisionan y los enlaces no son consecutivos. Los enlaces antiguos `/?p=...` siguen funcionando, sin cambiar las respuestas ni los permisos de edición del navegador.
 
 Pruebas de administración: compilar `scripts/test-admin.mjs` con esbuild para Node y ejecutar el resultado. Comprueban permisos, cookies, origen, invitaciones de un uso, cierre de sesión y compatibilidad de enlaces.
+
+Para habilitar la eliminación desde Administración, ejecutar también `supabase/admin-delete.sql`. Cada eliminación exige confirmación en pantalla, autorización de administrador y origen válido. La consulta y sus respuestas se borran en una sola transacción; el enlace compartido deja de funcionar.
