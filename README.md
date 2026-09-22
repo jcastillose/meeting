@@ -25,3 +25,15 @@ La alternativa usa la misma UI, validación y lógica de consultas; cambia el ad
 ## Comprobaciones
 
 `npx tsc --noEmit`, `npm run build` y `npx vite build --config vite.netlify.ts`. Los casos funcionales de API se prueban contra una base local temporal. Máximo 200 respuestas por consulta. Para una operación pública a gran escala añadir controles de abuso y retención según necesidades.
+
+## Administración e historial (Netlify + Supabase)
+
+Ejecutar `supabase/admin-setup.sql` una vez sobre la base existente. Es aditivo: conserva las consultas y sus respuestas. El panel `/admin` muestra todas las consultas, incluidas las anteriores, con búsqueda y paginación. Solo cuentas invitadas con `app_metadata.meeting_admin = true` pueden entrar. El permiso se comprueba contra Supabase en cada petición. Las cuentas públicas de Supabase no reciben ese permiso.
+
+La primera invitación se provisiona por el propietario de la base: generar 32 bytes aleatorios en hexadecimal, insertar su SHA-256 en `meeting_admin_invitations.token_hash` con `email=''` y entregar al propietario `/admin#invite=TOKEN`. No guardar el token en GitHub. Las siguientes invitaciones se crean desde el panel para un correo concreto, vencen en siete días y se consumen de forma atómica. El administrador comparte el enlace; la aplicación no envía correos. La persona invitada elige su contraseña. Las contraseñas son administradas por Supabase Auth; nunca se guardan en las tablas de la aplicación.
+
+Las sesiones duran ocho horas y usan cookies HttpOnly, Secure en HTTPS y SameSite=Strict. Solo se almacena el hash de la sesión en la base. Cerrar sesión elimina la sesión; cambiar contraseña cierra las demás. Para revocar una cuenta desde Supabase, quitar `meeting_admin` de sus metadatos de aplicación o eliminarla. No habilitar políticas de acceso público para las tablas de administración: solo las funciones del servidor acceden a ellas.
+
+Los enlaces compartidos usan `/r/titulo~codigo`. El código codifica el identificador aleatorio completo de 128 bits, de modo que títulos iguales no colisionan y los enlaces no son consecutivos. Los enlaces antiguos `/?p=...` siguen funcionando, sin cambiar las respuestas ni los permisos de edición del navegador.
+
+Pruebas de administración: compilar `scripts/test-admin.mjs` con esbuild para Node y ejecutar el resultado. Comprueban permisos, cookies, origen, invitaciones de un uso, cierre de sesión y compatibilidad de enlaces.
