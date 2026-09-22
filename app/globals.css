@@ -113,3 +113,6 @@ body {
 .admin-settings{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:24px}
 .admin-settings>section{padding:24px}.admin-settings h2{margin-bottom:12px}
 @media(max-width:700px){.admin-settings{grid-template-columns:1fr}.admin-entry{align-items:flex-start;flex-direction:column}.admin-shell .topbar{flex-wrap:wrap;gap:16px}.admin-history-toolbar form{flex-wrap:wrap}}
+
+.side .response-action{display:block;width:100%;max-width:100%;min-width:0;height:auto;min-height:36px;white-space:normal;overflow-wrap:anywhere;line-height:1.4;padding:8px 12px;text-align:center}
+.side>div{min-width:0}
