@@ -39,3 +39,9 @@ Los enlaces compartidos usan `/r/titulo~codigo`. El código codifica el identifi
 Pruebas de administración: compilar `scripts/test-admin.mjs` con esbuild para Node y ejecutar el resultado. Comprueban permisos, cookies, origen, invitaciones de un uso, cierre de sesión y compatibilidad de enlaces.
 
 Para habilitar la eliminación desde Administración, ejecutar también `supabase/admin-delete.sql`. Cada eliminación exige confirmación en pantalla, autorización de administrador y origen válido. La consulta y sus respuestas se borran en una sola transacción; el enlace compartido deja de funcionar.
+
+## Respuestas independientes y duración
+
+Al abrir una consulta con respuestas se muestra Coincidencias. Pulsar allí un horario consulta los participantes; no modifica respuestas. Una respuesta guardada requiere activar «Editar respuesta de…». Para compartir navegador, usar «Responder como otra persona»: crea un identificador independiente y conserva las respuestas anteriores, que pueden volver a editarse en ese navegador. Cada pestaña mantiene su identificador mientras trabaja. El servidor rechaza reutilizar una respuesta existente con otro nombre.
+
+Las nuevas consultas permiten establecer la duración de la reunión como múltiplo del bloque de calendario. Las coincidencias requieren disponibilidad continua durante toda esa duración; Google Calendar y el archivo .ics usan la misma duración. Las consultas anteriores sin duración explícita conservan la duración de un bloque.

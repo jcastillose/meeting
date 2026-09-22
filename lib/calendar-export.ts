@@ -20,9 +20,9 @@ export function zonedInstant(day:string,minutes:number,timezone:string):Date{
 }
 const stamp=(date:Date)=>date.toISOString().replace(/[-:]/g,'').replace(/\.\d{3}/,'');
 export function calendarEvent(poll:Poll,key:string,link:string,now=new Date()):string{
-  if(poll.mode!=='dates'||!validKeys(poll).has(key))throw Error('Selecciona un horario con una fecha concreta.');
+  if(poll.mode!=='dates'||!validKeys(poll).has(key)||Number(key.split('@')[1])+(poll.duration||poll.step)>poll.to)throw Error('Selecciona un horario con una fecha concreta.');
   const [day,minute]=key.split('@');
-  const start=zonedInstant(day,+minute,poll.timezone),end=zonedInstant(day,+minute+poll.step,poll.timezone);
+  const start=zonedInstant(day,+minute,poll.timezone),end=zonedInstant(day,+minute+(poll.duration||poll.step),poll.timezone);
   if(end<=start)throw Error('El bloque coincide con un cambio de hora. Elige otro horario.');
   return ['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//at meet//Horarios compartidos//ES','CALSCALE:GREGORIAN','BEGIN:VEVENT',
     `UID:${poll.id}-${day}-${minute}@atmeet.netlify.app`,`DTSTAMP:${stamp(now)}`,`DTSTART:${stamp(start)}`,`DTEND:${stamp(end)}`,
