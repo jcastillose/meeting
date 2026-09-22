@@ -116,3 +116,5 @@ body {
 
 .side .response-action{display:block;width:100%;max-width:100%;min-width:0;height:auto;min-height:36px;white-space:normal;overflow-wrap:anywhere;line-height:1.4;padding:8px 12px;text-align:center}
 .side>div{min-width:0}
+
+.slot.with-context{min-height:62px}.slot.group-context{background:#f6f7f7}.slot-personal{display:block;min-height:16px}.slot-group-context{display:flex;justify-content:center;flex-wrap:wrap;gap:3px;margin:4px 2px 3px;pointer-events:none}.slot-group-context>span{border-radius:4px;padding:1px 4px;font-size:10px;line-height:1.4;border:1px solid #00000012}.context-yes{background:#d8f3e8;color:#116347}.context-maybe{background:#fff0cc;color:#835700}.context-no{background:#fce5e7;color:#a32940}.slot-names-tooltip{max-width:min(340px,calc(100vw - 24px));max-height:300px;overflow-y:auto;overflow-wrap:anywhere;text-align:left;line-height:1.6;padding:12px 14px;border-radius:10px;box-shadow:0 4px 18px #0002}.slot-names-caption{font-size:11px;opacity:.8;margin:5px 0}.month .month-group-count{color:#55585d;background:#eef0f1;border-radius:4px;padding:2px 4px}
