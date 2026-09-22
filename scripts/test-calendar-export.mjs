@@ -1,0 +1,17 @@
+import assert from 'node:assert/strict';
+import {calendarEvent,zonedInstant} from '../lib/calendar-export.ts';
+const p={id:'p_'+'a'.repeat(32),title:'Reunión, equipo; prueba\\texto\nNueva línea',mode:'dates',start:'2026-09-22',end:'2026-09-22',from:540,to:1440,step:60,timezone:'America/Santiago',created:''};
+const ics=calendarEvent(p,'2026-09-22@540','https://example.com/r/test',new Date('2026-09-22T00:00:00Z'));
+assert(ics.includes('DTSTART:20260922T120000Z\r\n'));assert(ics.includes('DTEND:20260922T130000Z\r\n'));
+assert(ics.includes('SUMMARY:Reunión\\, equipo\\; prueba\\\\texto\\nNueva línea'));
+assert.equal(zonedInstant('2026-01-22',540,'America/Santiago').toISOString(),'2026-01-22T12:00:00.000Z');
+assert.equal(zonedInstant('2026-07-22',540,'America/Santiago').toISOString(),'2026-07-22T13:00:00.000Z');
+assert.equal(zonedInstant('2026-09-22',1440,'America/Santiago').toISOString(),'2026-09-23T03:00:00.000Z');
+assert.throws(()=>zonedInstant('2026-03-08',150,'America/New_York'));
+assert.equal(zonedInstant('2026-11-01',90,'America/New_York').toISOString(),'2026-11-01T05:30:00.000Z');
+assert.throws(()=>calendarEvent({...p,mode:'week'},'w0@540',''));
+assert.throws(()=>calendarEvent(p,'2026-09-23@540',''));
+const long=calendarEvent({...p,title:'á😊'.repeat(60)},'2026-09-22@540','https://example.com');
+for(const line of long.split('\r\n'))assert(Buffer.byteLength(line)<=75);
+assert(long.replace(/\r\n /g,'').includes('SUMMARY:'+'á😊'.repeat(60)));
+console.log('PASS: timezone, winter/summer, midnight, DST gaps/overlaps, escaping, UTF-8 folding and date validation.');
