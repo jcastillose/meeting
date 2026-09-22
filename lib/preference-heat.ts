@@ -15,5 +15,5 @@ export function heatStyle(count:number,max:number){
   const rgb=palette[index].map((value,i)=>Math.round(value+(palette[index+1][i]-value)*fraction));
   const linear=rgb.map(value=>{const c=value/255;return c<=.04045?c/12.92:((c+.055)/1.055)**2.4;});
   const luminance=.2126*linear[0]+.7152*linear[1]+.0722*linear[2];
-  return {background:`rgb(${rgb.join(', ')})`,color:luminance<.18?'#ffffff':'#152b22'};
+  return {background:`rgb(${rgb.join(', ')})`,color:luminance<.18?'#ffffff':'#000000'};
 }
