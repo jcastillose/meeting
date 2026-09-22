@@ -3,7 +3,7 @@ import {validKeys,type Poll,type Vote} from './domain';
 import type {Store} from './store';
 const dateString=z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine(s=>{const d=new Date(s+'T12:00:00Z');return !isNaN(+d)&&d.toISOString().slice(0,10)===s;});
 const input=z.object({title:z.string().trim().min(1).max(120),mode:z.enum(['dates','week','month']),start:dateString,end:dateString,from:z.number().int().min(0).max(1410),to:z.number().int().min(30).max(1440),step:z.union([z.literal(30),z.literal(60)]),timezone:z.string().max(80).refine(t=>{try{new Intl.DateTimeFormat('en',{timeZone:t});return true;}catch{return false;}})}).refine(p=>p.end>=p.start&&(+new Date(p.end)-+new Date(p.start))/86400000<=61&&p.to>p.from&&(p.to-p.from)%p.step===0&&p.from%p.step===0);
-const voteInput=z.object({token:z.string().regex(/^[a-f0-9]{64}$/),name:z.string().trim().min(1).max(80),comment:z.string().trim().max(1000),slots:z.record(z.enum(['yes','maybe','no'])).refine(s=>Object.keys(s).length>0&&Object.keys(s).length<=3000)});
+const voteInput=z.object({token:z.string().regex(/^[a-f0-9]{64}$/),name:z.string().trim().min(1).max(80),comment:z.string().trim().max(1000),slots:z.record(z.enum(['yes','maybe','no'])).refine(s=>Object.keys(s).length<=3000)});
 const headers={'Cache-Control':'no-store','X-Content-Type-Options':'nosniff'};
 const json=(d:unknown,status=200)=>Response.json(d,{status,headers});
 async function hash(s:string){return Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(s))),b=>b.toString(16).padStart(2,'0')).join('');}
