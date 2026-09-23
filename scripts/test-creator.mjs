@@ -6,7 +6,7 @@ const config={title:'Consulta de prueba',creator:{name:'  Persona de prueba  ',e
 const post=body=>handle(new Request('https://meeting.test/api/polls',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}),store);
 const created=await post(config);assert.equal(created.status,201);
 const {poll}=await created.json();assert(!('creator' in poll));
-assert.deepEqual(polls.get(poll.id).creator,{name:'Persona de prueba',email:'test@example.com'});
+assert.deepEqual(polls.get(poll.id).creator,{name:'Persona de prueba',email:'test@example.com',notify:true});
 const read=await handle(new Request('https://meeting.test/api/polls/'+poll.id),store,poll.id);
 assert(!('creator' in (await read.json()).poll));
 for(const creator of [undefined,{name:' ',email:'test@example.com'},{name:'Name',email:'invalid'}])assert.equal((await post({...config,creator})).status,400);

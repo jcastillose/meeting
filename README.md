@@ -53,3 +53,11 @@ En Netlify, configurar `RESEND_API_KEY` (clave con permiso de envío) y `RESEND_
 Cada respuesta nueva o modificada envía un aviso al correo del creador. Guardados idénticos no generan nuevos avisos. Resend recibe una clave de idempotencia para evitar duplicados en reintentos; se reintentan hasta tres veces los errores transitorios. Si todos fallan, la respuesta sigue guardada y el usuario ve un aviso; no existe una cola de reenvío diferido. Sin las variables configuradas o en consultas antiguas sin correo del creador, el envío permanece desactivado.
 
 La información del creador se guarda en los datos de la consulta y solo se devuelve mediante el historial administrativo. El formulario inicial precompleta su nombre desde «Tu nombre», conservando correcciones manuales.
+
+## Gestión privada, cierre y mensajes al grupo
+
+Aplicar `supabase/creator-management.sql` en Supabase. Las funciones están restringidas a `service_role`; el bloqueo de la fila de consulta serializa el cierre y el guardado para impedir respuestas tardías.
+
+Al crear una consulta se elige si se reciben avisos de nuevas respuestas (activados por defecto). Siempre se entrega un enlace privado de gestión y se envía al correo del creador. La parte secreta viaja en el fragmento del enlace, se elimina de la barra al abrir la gestión y se conserva en la sesión. El enlace público nunca devuelve la clave, su hash ni los correos de participantes. El creador puede recuperar acceso por correo desde la consulta, con un intervalo mínimo de cinco minutos; el nuevo enlace reemplaza los anteriores.
+
+Cada nuevo registro requiere correo. Respuestas antiguas sin correo siguen visibles pero no recibirán el mensaje final. Cerrar registros bloquea tanto altas como ediciones. Después del cierre, el creador puede revisar un asunto y mensaje y enviarlo a las direcciones únicas registradas; cada destinatario recibe un correo separado, sin exponer las otras direcciones. Se usan lotes de hasta 100 e idempotencia para reintentar un envío fallido sin duplicar los lotes aceptados durante la ventana de Resend. Los mensajes no se envían automáticamente al cerrar.

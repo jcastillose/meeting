@@ -29,3 +29,26 @@ export function resendNotifier(config:{apiKey:string;from:string;siteUrl:string}
  };
 }
 class PermanentDeliveryError extends Error{}
+
+export function managementMailer(config:{apiKey:string;from:string;siteUrl:string},fetcher:typeof fetch=fetch){
+ async function send(path:string,payload:unknown,key:string){
+  for(let attempt=0;attempt<3;attempt++){
+   try{const response=await fetcher('https://api.resend.com'+path,{method:'POST',headers:{Authorization:`Bearer ${config.apiKey}`,'Content-Type':'application/json','Idempotency-Key':key},body:JSON.stringify(payload),signal:AbortSignal.timeout(5000)});
+    if(response.ok)return;if(response.status<500&&response.status!==429)throw new PermanentDeliveryError();
+   }catch(e){if(e instanceof PermanentDeliveryError||attempt===2)throw Error('Email failed');}
+   if(attempt<2)await new Promise(r=>setTimeout(r,500*2**attempt));
+  }throw Error('Email failed');
+ }
+ return {
+  async access(poll:import('./domain').Poll,token:string){
+   const {managementPath}=await import('./api');
+   await send('/emails',{from:config.from,to:[poll.creator!.email],subject:`at meet · Gestiona tu consulta: ${poll.title.replace(/[\r\n]/g,' ')}`,text:`Hola, ${poll.creator!.name}:\n\nEste enlace privado permite cerrar los registros y enviar un mensaje a quienes respondieron:\n${new URL(managementPath(poll.id,token),config.siteUrl).href}\n\nGuárdalo y no lo compartas con participantes.\n\nPara compartir la consulta, usa este otro enlace:\n${new URL(pollPath(poll),config.siteUrl).href}\n\nLos avisos de nuevas respuestas están ${poll.creator!.notify===false?'desactivados':'activados'}. Puedes cambiarlo en la gestión de la consulta.`},`creator-access/${poll.id}/${token}`);
+  },
+  async group(poll:import('./domain').Poll,emails:string[],subject:string,message:string,key:string){
+   for(let offset=0;offset<emails.length;offset+=100){
+    const batch=emails.slice(offset,offset+100).map(email=>({from:config.from,to:[email],subject:`at meet · ${subject}`,text:`${poll.creator?.name||'Quien organiza'} envía este mensaje sobre «${poll.title}»:\n\n${message}\n\nConsulta cerrada: ${new URL(pollPath(poll),config.siteUrl).href}\n\nRecibes este correo porque registraste tu disponibilidad en esta consulta.`}));
+    await send('/emails/batch',batch,`meeting-message/${key}/${offset}`);
+   }
+  }
+ };
+}

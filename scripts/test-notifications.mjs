@@ -5,7 +5,7 @@ const poll={id:'p_'+'a'.repeat(32),title:'Prueba',creator:{name:'Creador',email:
 const saved=new Map();let failStorage=false,notifications=[];
 const store={getPoll:async()=>poll,getVotes:async()=>[],getVote:async id=>saved.get(id),saveVote:async v=>{if(failStorage)throw Error('Test storage failure');saved.set(v.id,v)}};
 const notify=async(...args)=>{notifications.push(args)};
-const vote={token:'a'.repeat(64),name:'Ana',comment:'Mañanas',slots:{w0: 'yes'}};vote.slots={'w0@540':'yes'};
+const vote={email:'participant@example.com',token:'a'.repeat(64),name:'Ana',comment:'Mañanas',slots:{w0: 'yes'}};vote.slots={'w0@540':'yes'};
 const put=(body,fn=notify)=>handle(new Request('https://meeting.test/api/polls/'+poll.id,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}),store,poll.id,fn);
 assert.equal((await put({...vote,slots:{invalid:'yes'}})).status,400);assert.equal(notifications.length,0);
 assert.equal((await put(vote)).status,200);assert.equal(notifications.length,1);assert.equal(notifications[0][2],undefined);

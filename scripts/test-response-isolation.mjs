@@ -7,8 +7,8 @@ const store={getPoll:async id=>polls.get(id)||null,createPoll:async p=>polls.set
 const request=(id,body)=>handle(new Request('https://meeting.test/api/polls'+(id?'/'+id:''),{method:id?'PUT':'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}),store,id);
 const config={creator:{name:'Creador de prueba',email:'creator@example.com'},title:'Reunión larga',mode:'dates',start:'2026-09-22',end:'2026-09-22',from:540,to:720,step:30,duration:90,timezone:'America/Santiago'};
 const result=await request(undefined,config);assert.equal(result.status,201);const {poll}=await result.json();assert.equal(poll.duration,90);
-const a={token:'a'.repeat(64),name:'Ana',comment:'',slots:{'2026-09-22@540':'yes','2026-09-22@570':'yes','2026-09-22@600':'yes'}};
-const b={token:'b'.repeat(64),name:'Luis',comment:'',slots:{'2026-09-22@540':'yes'}};
+const a={email:'participant@example.com',token:'a'.repeat(64),name:'Ana',comment:'',slots:{'2026-09-22@540':'yes','2026-09-22@570':'yes','2026-09-22@600':'yes'}};
+const b={email:'participant-b@example.com',token:'b'.repeat(64),name:'Luis',comment:'',slots:{'2026-09-22@540':'yes'}};
 assert.equal((await request(poll.id,a)).status,200);assert.equal((await request(poll.id,b)).status,200);
 assert.equal((await request(poll.id,{...b,slots:{}})).status,200);
 let saved=await store.getVotes(poll.id);assert.deepEqual(saved.find(v=>v.name==='Ana').slots,a.slots);
