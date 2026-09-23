@@ -45,3 +45,11 @@ Para habilitar la eliminación desde Administración, ejecutar también `supabas
 Al abrir una consulta con respuestas se muestra Coincidencias. Pulsar allí un horario consulta los participantes; no modifica respuestas. Una respuesta guardada requiere activar «Editar respuesta de…». Para compartir navegador, usar «Responder como otra persona»: crea un identificador independiente y conserva las respuestas anteriores, que pueden volver a editarse en ese navegador. Cada pestaña mantiene su identificador mientras trabaja. El servidor rechaza reutilizar una respuesta existente con otro nombre.
 
 Las nuevas consultas permiten establecer la duración de la reunión como múltiplo del bloque de calendario. Las coincidencias requieren disponibilidad continua durante toda esa duración; Google Calendar y el archivo .ics usan la misma duración. Las consultas anteriores sin duración explícita conservan la duración de un bloque.
+
+## Avisos al creador mediante Resend
+
+En Netlify, configurar `RESEND_API_KEY` (clave con permiso de envío) y `RESEND_FROM_EMAIL` (por ejemplo `at meet <avisos@tu-dominio-verificado.cl>`) con alcance Functions. No usar prefijos VITE_ ni guardar claves en el repositorio. Volver a desplegar después de configurar las variables. La variable de Netlify `URL` proporciona el dominio del enlace; el valor de respaldo es https://atmeet.netlify.app.
+
+Cada respuesta nueva o modificada envía un aviso al correo del creador. Guardados idénticos no generan nuevos avisos. Resend recibe una clave de idempotencia para evitar duplicados en reintentos; se reintentan hasta tres veces los errores transitorios. Si todos fallan, la respuesta sigue guardada y el usuario ve un aviso; no existe una cola de reenvío diferido. Sin las variables configuradas o en consultas antiguas sin correo del creador, el envío permanece desactivado.
+
+La información del creador se guarda en los datos de la consulta y solo se devuelve mediante el historial administrativo. El formulario inicial precompleta su nombre desde «Tu nombre», conservando correcciones manuales.
