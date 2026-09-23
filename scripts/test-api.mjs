@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 const base='http://localhost:5173';
 async function req(path,method='GET',body,expected=200,extra={}){const r=await fetch(base+path,{method,headers:{'Content-Type':'application/json',...extra},body:body?JSON.stringify(body):undefined});const raw=await r.text();assert.equal(r.status,expected,path+': '+raw);if(expected===403)return raw;return JSON.parse(raw);}
-const config={title:'Prueba local de persistencia',mode:'dates',start:'2026-09-21',end:'2026-09-30',from:540,to:1080,step:30,timezone:'America/Santiago'};
+const config={creator:{name:'Creador de prueba',email:'creator@example.com'},title:'Prueba local de persistencia',mode:'dates',start:'2026-09-21',end:'2026-09-30',from:540,to:1080,step:30,timezone:'America/Santiago'};
 const {poll}=await req('/api/polls','POST',config,201);const path='/api/polls/'+poll.id;
 const a={token:'a'.repeat(64),name:'Participante A (prueba)',comment:'Prefiero temprano',slots:{'2026-09-21@540':'yes','2026-09-21@570':'no'}};
 const b={token:'b'.repeat(64),name:'Participante B (prueba)',comment:'Puedo a primera hora',slots:{'2026-09-21@540':'yes','2026-09-22@540':'maybe'}};

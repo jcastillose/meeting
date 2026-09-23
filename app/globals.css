@@ -141,3 +141,5 @@ body {
 .month-guide{padding:4px 20px 18px;color:#28634c}.month-guide p{font-size:14px;color:#686a6d;margin-top:4px}
 .recurring-month{gap:8px;padding:0 20px 20px}.recurring-month button{border:1px solid #dce5df;border-radius:10px;min-height:98px;gap:2px}.recurring-month button.selected{box-shadow:inset 0 0 0 2px #28634c}.recurring-month strong{font-size:22px;line-height:1.2}.month-day-label{font-size:11px;color:inherit;opacity:.75}
 @media(max-width:600px){.recurring-month{grid-template-columns:repeat(4,minmax(0,1fr));padding:0 14px 14px;gap:6px}.recurring-month button{padding:8px;min-height:94px}.month-guide{padding:4px 14px 14px}}
+
+.creator-fields{border:1px solid #dce5df;border-radius:12px;padding:14px;background:#f6faf7;min-width:0}.creator-fields legend{font-size:14px;font-weight:650;padding:0 5px;color:#28634c}.creator-fields>p{margin:0 0 12px}.creator-fields .field:last-child{margin-bottom:0}.admin-creator{display:grid;gap:2px;margin:10px 0;font-size:14px;overflow-wrap:anywhere}.admin-creator>span{font-size:12px;color:#686a6d}.admin-creator strong{font-weight:600}.admin-creator a{color:#28634c}.admin-entry>div:first-child{min-width:0}

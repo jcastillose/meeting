@@ -1,6 +1,6 @@
 export type Mode = "dates"|"week"|"month";
 export type Status = "yes"|"maybe"|"no";
-export type Poll = {id:string; title:string; mode:Mode; start:string; end:string; from:number; to:number; step:number; duration?:number; timezone:string; created:string};
+export type Poll = {id:string; title:string; mode:Mode; start:string; end:string; from:number; to:number; step:number; duration?:number; timezone:string; created:string; creator?:{name:string;email:string}};
 export type Vote = {id:string; name:string; comment:string; slots:Record<string,Status>};
 export const weekdays=["Lunes","Martes","Miércoles","Jueves","Viernes","Sábado","Domingo"];
 export const modes={dates:"Fechas concretas",week:"Semana habitual",month:"Días habituales del mes"};
