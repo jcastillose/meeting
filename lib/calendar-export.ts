@@ -1,4 +1,4 @@
-import {add,validKeys,type Poll} from './domain';
+import {add,meetingFits,type Poll} from './domain';
 
 const text=(value:string)=>value.replace(/\\/g,'\\\\').replace(/\r\n|\r|\n/g,'\\n').replace(/;/g,'\\;').replace(/,/g,'\\,');
 function fold(line:string){
@@ -20,7 +20,7 @@ export function zonedInstant(day:string,minutes:number,timezone:string):Date{
 }
 const stamp=(date:Date)=>date.toISOString().replace(/[-:]/g,'').replace(/\.\d{3}/,'');
 export function calendarEvent(poll:Poll,key:string,link:string,now=new Date()):string{
-  if(poll.mode!=='dates'||!validKeys(poll).has(key)||Number(key.split('@')[1])+(poll.duration||poll.step)>poll.to)throw Error('Selecciona un horario con una fecha concreta.');
+  if(poll.mode!=='dates'||!meetingFits(poll,key))throw Error('Selecciona un horario con una fecha concreta.');
   const [day,minute]=key.split('@');
   const start=zonedInstant(day,+minute,poll.timezone),end=zonedInstant(day,+minute+(poll.duration||poll.step),poll.timezone);
   if(end<=start)throw Error('El bloque coincide con un cambio de hora. Elige otro horario.');
