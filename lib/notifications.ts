@@ -40,6 +40,9 @@ export function managementMailer(config:{apiKey:string;from:string;siteUrl:strin
   }throw Error('Email failed');
  }
  return {
+  async invitation(email:string,url:string,key:string){
+   await send('/emails',{from:config.from,to:[email],subject:'at meet · Invitación de administración',text:`Has recibido una invitación para administrar at meet.\n\nActiva tu cuenta y define tu contraseña mediante este enlace privado:\n${url}\n\nTendrás acceso al historial de consultas y podrás invitar a otras personas administradoras.\n\nEl enlace vence en 7 días y solo puede usarse una vez. No lo compartas. Si no esperabas esta invitación, puedes ignorarla.`},key);
+  },
   async access(poll:import('./domain').Poll,token:string){
    const {managementPath}=await import('./api');
    await send('/emails',{from:config.from,to:[poll.creator!.email],subject:`at meet · Gestiona tu consulta: ${poll.title.replace(/[\r\n]/g,' ')}`,text:`Hola, ${poll.creator!.name}:\n\nEste enlace privado permite cerrar los registros y enviar un mensaje a quienes respondieron:\n${new URL(managementPath(poll.id,token),config.siteUrl).href}\n\nGuárdalo y no lo compartas con participantes.\n\nPara compartir la consulta, usa este otro enlace:\n${new URL(pollPath(poll),config.siteUrl).href}\n\nLos avisos de nuevas respuestas están ${poll.creator!.notify===false?'desactivados':'activados'}. Puedes cambiarlo en la gestión de la consulta.`},`creator-access/${poll.id}/${token}`);

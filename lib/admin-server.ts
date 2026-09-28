@@ -7,7 +7,8 @@ export async function digest(value:string){return Array.from(new Uint8Array(awai
 class HttpError extends Error {constructor(public status:number,message:string){super(message);}}
 type AdminUser={id:string;email?:string;app_metadata?:Record<string,unknown>};
 
-export function adminHandler(url:string,key:string,fetcher:typeof fetch=fetch){
+export type InvitationMailer=(email:string,url:string,key:string)=>Promise<void>;
+export function adminHandler(url:string,key:string,fetcher:typeof fetch=fetch,mailer?:InvitationMailer){
   const root=url.replace(/\/$/,'');
   async function call(path:string,method='GET',body?:unknown,bearer=key){
     const r=await fetcher(root+path,{method,headers:{apikey:key,Authorization:`Bearer ${bearer}`,'Content-Type':'application/json'},body:body===undefined?undefined:JSON.stringify(body)});
@@ -97,7 +98,10 @@ export function adminHandler(url:string,key:string,fetcher:typeof fetch=fetch){
       if(path==='invitations'&&request.method==='POST'){
         const {email}=credentials.pick({email:true}).parse(body),token=secret();
         await rest('meeting_admin_invitations','POST',{token_hash:await digest(token),email,created_by:user.id});
-        return reply({url:current.origin+'/admin#invite='+token,expiresInDays:7},201);
+        const invitationUrl=current.origin+'/admin#invite='+token;
+        let emailSent=false;
+        if(mailer){try{await mailer(email,invitationUrl,'admin-invite/'+await digest(token));emailSent=true;}catch{console.error('Admin invitation email delivery failed');}}
+        return reply({url:invitationUrl,expiresInDays:7,emailSent},201);
       }
       if(path==='password'&&request.method==='POST'){
         const input=z.object({currentPassword:z.string().min(1).max(128),password:z.string().min(12).max(128)}).parse(body);

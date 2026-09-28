@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {handle} from '../lib/api.ts';
-import {resendNotifier} from '../lib/notifications.ts';
+import {resendNotifier,managementMailer} from '../lib/notifications.ts';
 const poll={id:'p_'+'a'.repeat(32),title:'Prueba',creator:{name:'Creador',email:'creator@example.com'},mode:'week',start:'2026-09-23',end:'2026-09-30',from:540,to:720,step:60,timezone:'America/Santiago',created:new Date().toISOString()};
 const saved=new Map();let failStorage=false,notifications=[];
 const store={getPoll:async()=>poll,getVotes:async()=>[],getVote:async id=>saved.get(id),saveVote:async v=>{if(failStorage)throw Error('Test storage failure');saved.set(v.id,v)}};
@@ -17,3 +17,10 @@ const sender=resendNotifier({apiKey:'secret',from:'at meet <test@example.com>',s
 await sender(...notifications[0]);assert.equal(calls.length,2);assert.equal(calls[0].headers['Idempotency-Key'],calls[1].headers['Idempotency-Key']);assert.equal(calls[0].body,calls[1].body);const payload=JSON.parse(calls[0].body);assert.deepEqual(payload.to,['creator@example.com']);assert.match(payload.text,/Ana registró/);assert.match(payload.text,/https:\/\/atmeet.netlify.app\/r\//);assert(!payload.text.includes(vote.token));
 const noCreator={...poll,creator:undefined};calls=[];await sender(noCreator,notifications[0][1],undefined,'key');assert.equal(calls.length,0);
 console.log('PASS: notification after valid save, changes only, failed delivery preserves vote, transient retries use same key, legacy skip');
+
+let inviteCalls=[];
+const invitationMailer=managementMailer({apiKey:'secret',from:'at meet <atmeet@contact.agencements.net>',siteUrl:'https://atmeet.netlify.app'},async(url,options)=>{inviteCalls.push({url,...options});return inviteCalls.length===1?new Response(null,{status:503}):Response.json({id:'invitation'});});
+await invitationMailer.invitation('invited@example.com','https://atmeet.netlify.app/admin#invite=private-token','admin-invite/test');
+assert.equal(inviteCalls.length,2);assert.equal(inviteCalls[0].body,inviteCalls[1].body);assert.equal(inviteCalls[0].headers['Idempotency-Key'],inviteCalls[1].headers['Idempotency-Key']);
+const invitationPayload=JSON.parse(inviteCalls[0].body);assert.deepEqual(invitationPayload.to,['invited@example.com']);assert.equal(invitationPayload.from,'at meet <atmeet@contact.agencements.net>');assert.match(invitationPayload.text,/7 días/);assert.match(invitationPayload.text,/https:\/\/atmeet.netlify.app\/admin#invite=/);
+console.log('PASS: invitation recipient, sender, private link, expiry and idempotent retry');
