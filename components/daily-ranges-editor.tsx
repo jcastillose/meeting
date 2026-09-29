@@ -1,6 +1,79 @@
-import {Button} from '@/components/ui/button';
-import {add,clock,type DailyRange} from '@/lib/domain';
-export function DailyRangesEditor({ranges,step,onChange}:{ranges:DailyRange[];step:number;onChange:(ranges:DailyRange[])=>void}){
- const update=(i:number,patch:Partial<DailyRange>)=>onChange(ranges.map((r,n)=>n===i?{...r,...patch}:r));
- return <fieldset className="daily-ranges"><legend>Días y horarios propuestos</legend><p className="small muted">Añade solo las fechas que quieres ofrecer y define un rango para cada una. Por ejemplo, lunes de 09:00 a 12:00 y miércoles de 15:00 a 18:00. Máximo 62 días de extensión.</p>{ranges.map((r,i)=><div className="daily-range" key={i}><label className="field range-date">Fecha {i+1}<input type="date" required value={r.date} onChange={e=>update(i,{date:e.target.value})}/></label><label className="field">Desde<select aria-label={`Hora inicial del día ${i+1}`} value={r.from} onChange={e=>update(i,{from:Number(e.target.value)})} style={{padding:10,border:'1px solid #cfd0d2',borderRadius:8,background:'white'}}>{Array.from({length:1440/step},(_,j)=>j*step).map(t=><option key={t} value={t}>{clock(t)}</option>)}</select></label><label className="field">Hasta<select aria-label={`Hora final del día ${i+1}`} value={r.to} onChange={e=>update(i,{to:Number(e.target.value)})} style={{padding:10,border:'1px solid #cfd0d2',borderRadius:8,background:'white'}}>{Array.from({length:1440/step},(_,j)=>(j+1)*step).map(t=><option key={t} value={t}>{clock(t)}</option>)}</select></label><Button type="button" variant="outline" disabled={ranges.length===1} aria-label={`Quitar día ${i+1}`} onClick={()=>onChange(ranges.filter((_,n)=>n!==i))}>Quitar</Button></div>)}<Button type="button" variant="outline" style={{marginTop:16}} disabled={ranges.length>=62||ranges.some(r=>!r.date)} onClick={()=>{const last=[...ranges].sort((a,b)=>a.date.localeCompare(b.date)).at(-1)!;onChange([...ranges,{...last,date:add(last.date,1)}]);}}>+ Añadir día</Button></fieldset>;
+"use client";
+import { useId, useMemo } from "react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import type { DailyRange } from "@/lib/domain";
+import { scheduleErrors } from "@/lib/schedule";
+import { WrittenRanges } from "./scheduling/written-ranges";
+import { VisualSchedule } from "./scheduling/visual-schedule";
+import "./scheduling/schedule-editor.css";
+export type DailyRangesEditorProps = {
+  ranges: DailyRange[];
+  step: number;
+  duration?: number;
+  onChange: (ranges: DailyRange[]) => void;
+  disabled?: boolean;
+};
+/** Controlled editor: the parent owns the draft; neither view sends network requests. */
+export function DailyRangesEditor({
+  ranges,
+  step,
+  duration = step,
+  onChange,
+  disabled = false,
+}: DailyRangesEditorProps) {
+  const id = useId();
+  const errors = useMemo(
+    () => scheduleErrors(ranges, step, duration),
+    [ranges, step, duration],
+  );
+  return (
+    <fieldset
+      className="schedule-editor"
+      disabled={disabled}
+      aria-describedby={id + "-description"}
+      aria-busy={disabled}
+    >
+      <legend>Días y horarios propuestos</legend>
+      <p id={id + "-description"} className="schedule-help">
+        Escribe tus tramos o márcalos en el calendario. Puedes proponer varios
+        horarios por fecha y dejar pausas entre ellos.
+      </p>
+      <Tabs defaultValue="written">
+        <TabsList aria-label="Forma de editar horarios">
+          <TabsTrigger value="written">Escribir horarios</TabsTrigger>
+          <TabsTrigger value="visual">Calendario visual</TabsTrigger>
+        </TabsList>
+        <TabsContent value="written">
+          <WrittenRanges
+            ranges={ranges}
+            step={step}
+            onChange={onChange}
+            disabled={disabled}
+          />
+        </TabsContent>
+        <TabsContent value="visual">
+          <VisualSchedule
+            ranges={ranges}
+            step={step}
+            onChange={onChange}
+            disabled={disabled}
+          />
+        </TabsContent>
+      </Tabs>
+      <div aria-live="polite" className="schedule-validation">
+        {errors.length ? (
+          <ul>
+            {errors.map((e) => (
+              <li key={e}>{e}</li>
+            ))}
+          </ul>
+        ) : (
+          <p>
+            Horarios válidos · {new Set(ranges.map((r) => r.date)).size} fechas
+            · Reunión de {duration} minutos.
+          </p>
+        )}
+      </div>
+    </fieldset>
+  );
 }
