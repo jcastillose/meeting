@@ -50,3 +50,7 @@ En Administración, «Gestionar y notificar» abre la consulta usando la sesión
 Después del cierre, la vista previa del mensaje incluye el horario confirmado. El envío individual oculta los correos de los demás participantes, omite respuestas antiguas sin correo y rechaza una vista previa cuyo horario quedó desactualizado. La confirmación del cierre no envía el correo automáticamente.
 
 Aplicar también `supabase/account-management.sql` después de `account-roles.sql`, antes de publicar. Las pruebas `scripts/test-management.mjs` usan correo simulado; `supabase/test-account-roles.sql` verifica los permisos dentro de una transacción que se revierte.
+
+### Corrección del límite entre Auth y la base de aplicación
+
+`recovery-auth-boundary.sql` evita consultas directas de las funciones de aplicación a `auth.users`. El servidor verifica el usuario mediante Auth Admin API y sincroniza únicamente ID, correo, rol y versión en `meeting_accounts`, con RLS y acceso exclusivo de servidor. No se copian contraseñas ni sus hashes. Los cambios de versión invalidan enlaces antiguos. Ejecutar `test-recovery-service-role.sql` con el rol real `service_role`; probar solo como `postgres` no detecta este tipo de fallo.

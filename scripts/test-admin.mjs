@@ -11,6 +11,7 @@ const fetcher=async(url,options={})=>{
  if(p==='/auth/v1/logout')return new Response(null,{status:204});
  if(p==='/auth/v1/admin/users/'+user.id)return ok({...user,app_metadata:privileged?user.app_metadata:{}});
  if(p==='/auth/v1/admin/users'){created++;return ok(user);}
+ if(p==='/rest/v1/rpc/meeting_sync_account')return ok(null);
  if(p==='/rest/v1/meeting_admin_sessions'){
    const h=u.searchParams.get('token_hash')?.slice(3);
    if(options.method==='POST'){rows.set(b.token_hash,b);return new Response(null,{status:201});}

@@ -17,6 +17,7 @@ const fetcher=async(url,o={})=>{const u=new URL(url),p=u.pathname,b=o.body?JSON.
  if(p==='/auth/v1/admin/users/'+uid)return ok(auth());
  if(p==='/rest/v1/admin_accounts')return ok([auth()]);
  if(p==='/rest/v1/rpc/admin_login_attempt')return ok(true);
+ if(p==='/rest/v1/rpc/meeting_sync_account')return ok(null);
  if(p==='/rest/v1/meeting_admin_sessions'){
   if(o.method==='POST'){sessions.set(b.token_hash,b);return ok(null);}
   if(o.method==='DELETE'){sessions.clear();return ok(null);}
@@ -25,6 +26,8 @@ const fetcher=async(url,o={})=>{const u=new URL(url),p=u.pathname,b=o.body?JSON.
  if(p==='/rest/v1/rpc/meeting_account_history'){historyUser=b.p_user;return ok({total:1,polls:[{poll,responseCount:1}]});}
  if(p==='/rest/v1/polls')return ok([{data:JSON.stringify(poll)}]);
  if(p==='/rest/v1/rpc/meeting_extend_poll'){assert.equal(b.p_user,uid);patched=b;return ok({...poll,...b.p_patch,scheduleRevision:1});}
+ if(p==='/rest/v1/meeting_accounts')return ok(u.searchParams.get('email')==='eq.'+user.email?[{user_id:uid}]:[]);
+ if(p==='/rest/v1/meeting_password_resets')return ok(reset===u.searchParams.get('token_hash')?.slice(3)?[{user_id:uid,password_snapshot:''}]:[]);
  if(p==='/rest/v1/rpc/meeting_issue_reset'){if(b.p_email!==user.email||reset)return ok(false);reset=b.p_hash;return ok(true);}
  if(p==='/rest/v1/rpc/meeting_claim_reset'){if(b.p_hash!==reset)return ok(null);reset=null;return ok(uid);}
  throw Error('Unexpected '+p);

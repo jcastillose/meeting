@@ -6,7 +6,7 @@ const inviteToken=z.string().regex(/^[a-f0-9]{64}$/);
 const secret=()=>Array.from(crypto.getRandomValues(new Uint8Array(32)),b=>b.toString(16).padStart(2,'0')).join('');
 export async function digest(value:string){return Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(value))),b=>b.toString(16).padStart(2,'0')).join('');}
 class HttpError extends Error {constructor(public status:number,message:string){super(message);}}
-type AdminUser={id:string;email?:string;app_metadata?:Record<string,unknown>};
+type AdminUser={id:string;email?:string;updated_at?:string;app_metadata?:Record<string,unknown>};
 
 const accountRole=(user:AdminUser)=>user?.app_metadata?.meeting_admin===true?'admin':user?.app_metadata?.meeting_role==='manager'?'manager':null;
 export type AdminMailer=(kind:'invite'|'reset',email:string,url:string,key:string)=>Promise<void>;
@@ -20,6 +20,7 @@ export function adminHandler(url:string,key:string,fetcher:typeof fetch=fetch,ma
     return data?JSON.parse(data):null;
   }
   const rest=(path:string,method='GET',body?:unknown)=>call('/rest/v1/'+path,method,body);
+  const syncAccount=(user:AdminUser)=>rest('rpc/meeting_sync_account','POST',{p_user:user.id,p_email:user.email,p_role:accountRole(user),p_version:user.updated_at||''});
   return async function handler(request:Request):Promise<Response>{
     const current=new URL(request.url),secure=current.protocol==='https:',cookieName=secure?'__Host-meeting-admin':'meeting-admin';
     const responseHeaders=new Headers({'Cache-Control':'no-store','X-Content-Type-Options':'nosniff'});
@@ -29,6 +30,7 @@ export function adminHandler(url:string,key:string,fetcher:typeof fetch=fetch,ma
     async function session(user:AdminUser){
       const token=secret();issuedSession=await digest(token);
       await rest('meeting_admin_sessions','POST',{token_hash:issuedSession,user_id:user.id,expires_at:new Date(Date.now()+8*3600000).toISOString()});
+      await syncAccount(user);
       cookie(token,8*3600);
     }
     async function signedIn(){
@@ -39,6 +41,7 @@ export function adminHandler(url:string,key:string,fetcher:typeof fetch=fetch,ma
       if(!rows?.[0])throw new HttpError(401,'Tu sesión terminó. Vuelve a iniciar sesión.');
       const user:AdminUser=await call('/auth/v1/admin/users/'+encodeURIComponent(rows[0].user_id));
       if(!accountRole(user))throw new HttpError(403,'Esta cuenta no tiene acceso de administración.');
+      await syncAccount(user);
       return {user,hash};
     }
     try{
@@ -55,6 +58,12 @@ export function adminHandler(url:string,key:string,fetcher:typeof fetch=fetch,ma
       if(path==='forgot-password'&&request.method==='POST'){
         const {email}=credentials.pick({email:true}).parse(body);
         if(!mailer)throw new HttpError(503,'El envío de correos no está disponible.');
+        const generic={message:'Si existe una cuenta activa con ese correo, recibirás un enlace para recuperar tu contraseña.'};
+        const accounts=await rest(`meeting_accounts?email=eq.${encodeURIComponent(email)}&select=user_id`);
+        if(!accounts?.[0])return reply(generic);
+        const user:AdminUser=await call('/auth/v1/admin/users/'+encodeURIComponent(accounts[0].user_id));
+        if(!accountRole(user))return reply(generic);
+        await syncAccount(user);
         const token=secret(),hash=await digest(token);
         const issued=await rest('rpc/meeting_issue_reset','POST',{p_email:email,p_hash:hash});
         if(issued){try{await mailer('reset',email,current.origin+'/admin#reset='+token,'account-reset/'+hash);}catch{console.error('Account recovery email delivery failed');}}
@@ -62,6 +71,12 @@ export function adminHandler(url:string,key:string,fetcher:typeof fetch=fetch,ma
       }
       if(path==='reset-password'&&request.method==='POST'){
         const input=z.object({token:inviteToken,password:z.string().min(12).max(128)}).parse(body);
+        const tokenHash=await digest(input.token);
+        const resets=await rest(`meeting_password_resets?token_hash=eq.${tokenHash}&select=user_id,password_snapshot`);
+        if(!resets?.[0])throw new HttpError(400,'El enlace no es válido, ha vencido o ya fue utilizado. Solicita uno nuevo.');
+        const user:AdminUser=await call('/auth/v1/admin/users/'+encodeURIComponent(resets[0].user_id));
+        if(!accountRole(user)||(user.updated_at||'')!==resets[0].password_snapshot)throw new HttpError(400,'El enlace ya no es válido. Solicita uno nuevo.');
+        await syncAccount(user);
         const uid=await rest('rpc/meeting_claim_reset','POST',{p_hash:await digest(input.token)});
         if(!uid)throw new HttpError(400,'El enlace no es válido, ha vencido o ya fue utilizado. Solicita uno nuevo.');
         await call('/auth/v1/admin/users/'+encodeURIComponent(uid),'PUT',{password:input.password});
