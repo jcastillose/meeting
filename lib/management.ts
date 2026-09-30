@@ -33,6 +33,12 @@ export async function manage(request:Request,store:Store,id:string,mailAccess?:C
    const {manageHash,...safe}=updated;return reply({poll:safe});
   }
   if(body.action==='view'){const {manageHash,...safe}=poll;return reply({poll:safe,votes:await store.getVotes(id)});}
+  if(body.action==='reopen'){
+   if(!account)return reply({error:'Inicia sesión con una cuenta de Administración o Gestión para reabrir registros.'},403);
+   const updated=await store.accountManage?.(account.id,id,'reopen');
+   if(!updated)return reply({error:'No se pudo reabrir la consulta. Actualiza la página y revisa tu acceso.'},409);
+   const {manageHash,...safe}=updated;return reply({poll:safe});
+  }
   if(body.action==='close'||body.action==='notifications'){
    const value=body.action==='notifications'?z.boolean().parse(body.notify):undefined;
    const updated=account?await store.accountManage?.(account.id,id,body.action,value):await store.managePoll?.(id,poll.manageHash!,body.action,value);if(!updated)return reply({error:'No se pudo actualizar la consulta.'},409);

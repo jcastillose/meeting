@@ -26,7 +26,7 @@ await mailer.group(polls.get(id),['a@example.com','b@example.com'],'Final','Hola
 console.log('PASS: opt-out, creator mail, owner authentication, CSRF, private emails, closed/racing writes rejected, group gate, recipient isolation and access recovery');
 
 const managed=polls.get(id);managed.ownerId='creator-account';
-store.accountManage=async(uid,pid,action,notify,slot,date)=>{const p=polls.get(pid);if(uid!==p.ownerId)return null;if(action==='finalize'){p.selectedSlot=slot;p.selectedDate=date;p.closed=true;}else if(action==='close')p.closed=true;else p.creator.notify=notify;return p;};
+store.accountManage=async(uid,pid,action,notify,slot,date)=>{const p=polls.get(pid);if(uid!==p.ownerId)return null;if(action==='finalize'){p.selectedSlot=slot;p.selectedDate=date;p.closed=true;}else if(action==='close')p.closed=true;else if(action==='reopen'){p.closed=false;delete p.closedAt;delete p.selectedSlot;delete p.selectedDate;}else p.creator.notify=notify;return p;};
 const accountCommand=(body,account={id:'creator-account',role:'manager'})=>manage(request('/api/polls/'+id+'/manage',body),store,id,undefined,async(...args)=>group.push(args),account);
 assert.equal((await accountCommand({action:'view'},{id:'foreign',role:'manager'})).status,403);
 assert.equal((await accountCommand({action:'view'})).status,200);
@@ -38,3 +38,13 @@ assert.equal((await accountCommand({action:'send',subject:'Final',message:'Listo
 assert.equal((await accountCommand({action:'send',subject:'Final',message:'Listo',selectedSlot:'w0@540',selectedDate:'2026-10-05',requestId:crypto.randomUUID()})).status,200);
 requests=[];await mailer.group(managed,['a@example.com'],'Final','Listo','selected-key');assert.match(requests[0].body[0].text,/Horario seleccionado:/);assert.match(requests[0].body[0].text,/09:00/);assert.match(requests[0].body[0].text,/America\/Santiago/);
 console.log('PASS: account management owner isolation, date matching, final selection, close, stale preview and selected schedule email');
+
+const preservedVotes=JSON.stringify(await store.getVotes(id));
+assert.equal((await command({action:'reopen',token:managementToken})).status,403);
+assert.equal((await accountCommand({action:'reopen'},{id:'foreign',role:'manager'})).status,403);
+assert.equal((await accountCommand({action:'reopen'})).status,200);
+assert.equal(managed.closed,false);assert.equal(managed.selectedSlot,undefined);assert.equal(managed.selectedDate,undefined);
+assert.equal(JSON.stringify(await store.getVotes(id)),preservedVotes);
+assert.equal((await put({...vote,slots:{'w1@540':'yes'}})).status,200);
+assert.equal((await accountCommand({action:'send',subject:'Old final',message:'Test',requestId:crypto.randomUUID()})).status,409);
+console.log('PASS: account-only reopening, manager ownership, preserved responses, removed final selection, reopened votes and disabled final mail');
