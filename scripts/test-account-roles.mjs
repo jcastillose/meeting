@@ -24,6 +24,7 @@ const fetcher=async(url,o={})=>{const u=new URL(url),p=u.pathname,b=o.body?JSON.
   return ok(sessions.has(u.searchParams.get('token_hash')?.slice(3))?[{user_id:uid}]:[]);
  }
  if(p==='/rest/v1/rpc/meeting_account_history'){historyUser=b.p_user;return ok({total:1,polls:[{poll,responseCount:1}]});}
+ if(p==='/rest/v1/rpc/meeting_account_delete_poll'){assert.equal(b.p_user,uid);return ok(role==='admin'||poll.ownerId===uid);}
  if(p==='/rest/v1/polls')return ok([{data:JSON.stringify(poll)}]);
  if(p==='/rest/v1/rpc/meeting_extend_poll'){assert.equal(b.p_user,uid);patched=b;return ok({...poll,...b.p_patch,scheduleRevision:1});}
  if(p==='/rest/v1/meeting_accounts')return ok(u.searchParams.get('email')==='eq.'+user.email?[{user_id:uid}]:[]);
@@ -36,13 +37,14 @@ const app=adminHandler('https://db.test','server-secret',fetcher,async(...args)=
 const req=(path,body,cookie)=>new Request('https://meeting.test/api/admin/'+path,{method:body===undefined?'GET':'POST',headers:{origin:'https://meeting.test','content-type':'application/json',...(cookie?{cookie}:{})},body:body===undefined?undefined:JSON.stringify(body)});
 const login=await app(req('login',{email:user.email,password}));assert.equal(login.status,200);assert.equal((await login.json()).role,'manager');const cookie=login.headers.get('set-cookie').split(';')[0];
 assert.equal((await app(req('history',undefined,cookie))).status,200);assert.equal(historyUser,uid);
-for(const action of ['invitations','delete-poll'])assert.equal((await app(req(action,{email:'other@example.com',id:poll.id,role:'admin'},cookie))).status,403);
+for(const action of ['invitations'])assert.equal((await app(req(action,{email:'other@example.com',id:poll.id,role:'admin'},cookie))).status,403);
 const extension={id:poll.id,revision:0,ranges:[{date:'2026-10-02',from:720,to:840}]};
 assert.equal((await app(req('extend-poll',extension))).status,401);
 assert.equal((await app(req('extend-poll',extension,cookie))).status,200);assert.equal(patched.p_user,uid);
 const next={...poll,...patched.p_patch};for(const key of validKeys(poll))assert(validKeys(next).has(key));assert.equal(next.ownerId,uid);
 assert.equal((await app(req('extend-poll',{...extension,revision:2},cookie))).status,409);
-poll.ownerId='another-account';assert.equal((await app(req('extend-poll',extension,cookie))).status,404);
+assert.equal((await app(req('delete-poll',{id:poll.id},cookie))).status,200);
+poll.ownerId='another-account';assert.equal((await app(req('delete-poll',{id:poll.id},cookie))).status,404);assert.equal((await app(req('extend-poll',extension,cookie))).status,404);
 role='admin';assert.equal((await app(req('extend-poll',extension,cookie))).status,200);role='manager';poll.ownerId=uid;
 assert.throws(()=>extendSchedule(poll,{ranges:[{date:'2027-01-01',from:720,to:840}]}));
 const recurring={...poll,mode:'week'};assert.throws(()=>extendSchedule(recurring,{from:600,to:660}));assert.deepEqual(extendSchedule(recurring,{from:480,to:720}),{from:480,to:720});

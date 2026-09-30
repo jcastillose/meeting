@@ -26,7 +26,7 @@ const fetcher=async(url,options={})=>{
  if(p==='/rest/v1/rpc/meeting_claim_account_invitation'){
    const inv=invitations.get(b.p_hash);if(!inv||inv.used)return ok([]);inv.used=true;return ok([{email:inv.email,role:inv.role}]);
  }
- if(p==='/rest/v1/rpc/meeting_delete_poll'){if(deleted.includes(b.p_id))return ok(false);deleted.push(b.p_id);return ok(true);}
+ if(p==='/rest/v1/rpc/meeting_account_delete_poll'){if(deleted.includes(b.p_id))return ok(false);deleted.push(b.p_id);return ok(true);}
  if(p==='/rest/v1/rpc/meeting_account_history'){historyCalls++;return ok({polls:[],total:0});}
  throw Error('Unexpected fetch '+p);
 };

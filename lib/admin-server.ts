@@ -1,3 +1,4 @@
+import {submitAccountRequest,reviewAccountRequests} from './account-requests';
 import {extendSchedule} from './schedule-extension';
 import {z} from 'zod';
 
@@ -55,6 +56,7 @@ export function adminHandler(url:string,key:string,fetcher:typeof fetch=fetch,ma
         const raw=await request.text();if(raw.length>40000)throw new HttpError(413,'Solicitud demasiado grande.');
         try{body=JSON.parse(raw);}catch{throw new HttpError(400,'Formato no permitido.');}
       }
+      if(path==='request-account'&&request.method==='POST'){const result=await submitAccountRequest(body,rest);return reply(result.data,result.status);}
       if(path==='forgot-password'&&request.method==='POST'){
         const {email}=credentials.pick({email:true}).parse(body);
         if(!mailer)throw new HttpError(503,'El envío de correos no está disponible.');
@@ -116,6 +118,7 @@ export function adminHandler(url:string,key:string,fetcher:typeof fetch=fetch,ma
         cookie('',0);return reply({ok:true});
       }
       const {user}=await signedIn();
+      if(path==='account-requests'||path==='review-request'){const result=await reviewAccountRequests(path,request.method,body,current,user,accountRole(user),rest,mailer);return reply(result.data,result.status);}
       if(path==='me'&&request.method==='GET')return reply({id:user.id,email:user.email,role:accountRole(user)});
       if(path==='history'&&request.method==='GET'){
         const offset=z.coerce.number().int().min(0).max(1000000).parse(current.searchParams.get('offset')||0);
@@ -134,11 +137,10 @@ export function adminHandler(url:string,key:string,fetcher:typeof fetch=fetch,ma
         return reply({poll:updated});
       }
       if(path==='delete-poll'&&request.method==='POST'){
-        if(accountRole(user)!=='admin')throw new HttpError(403,'Solo administración puede eliminar consultas.');
         const parsed=z.object({id:z.string().regex(/^p_[a-f0-9]{32}$/)}).safeParse(body);
         if(!parsed.success)throw new HttpError(400,'El identificador de la consulta no es válido.');
-        const deleted=await rest('rpc/meeting_delete_poll','POST',{p_id:parsed.data.id});
-        if(!deleted)throw new HttpError(404,'La consulta ya no existe. Actualiza el historial.');
+        const deleted=await rest('rpc/meeting_account_delete_poll','POST',{p_id:parsed.data.id,p_user:user.id});
+        if(!deleted)throw new HttpError(404,'La consulta no existe o no pertenece a tu cuenta. Actualiza el historial.');
         return reply({ok:true});
       }
       if(path==='invitations'&&request.method==='POST'){

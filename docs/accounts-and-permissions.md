@@ -12,7 +12,7 @@ Remitentes: `atmeet@contact.agencements.net` y `atmeetfahu@contact.agencements.n
 |---|---|---|
 | Historial | Todas las consultas | Solo creadas con esa cuenta |
 | Añadir días y horarios | Cualquier consulta | Solo propias |
-| Eliminar | Todas | No |
+| Eliminar | Todas | Solo propias |
 | Invitar cuentas | Administración o gestión | No |
 | Recuperar/cambiar contraseña | Propia | Propia |
 
@@ -54,3 +54,13 @@ Aplicar también `supabase/account-management.sql` después de `account-roles.sq
 ### Corrección del límite entre Auth y la base de aplicación
 
 `recovery-auth-boundary.sql` evita consultas directas de las funciones de aplicación a `auth.users`. El servidor verifica el usuario mediante Auth Admin API y sincroniza únicamente ID, correo, rol y versión en `meeting_accounts`, con RLS y acceso exclusivo de servidor. No se copian contraseñas ni sus hashes. Los cambios de versión invalidan enlaces antiguos. Ejecutar `test-recovery-service-role.sql` con el rol real `service_role`; probar solo como `postgres` no detecta este tipo de fallo.
+
+## Solicitudes de cuenta
+
+En Administración, sin sesión, «Solicitar cuenta de gestión» recoge nombre, correo y mensaje opcional. La solicitud no concede acceso ni permite elegir privilegios. Administración ve una bandeja paginada, elige Gestión o Administración y confirma la aprobación o el rechazo. Al aprobar se genera una invitación de siete días y se envía al correo registrado, usando el remitente de cada sitio. Si falla el envío, se muestra el enlace privado para compartirlo manualmente.
+
+El correo se verifica al utilizar la invitación. Las solicitudes no deben considerarse identidad verificada al revisarlas. Se deduplican por correo, no se sobrescriben decisiones anteriores y la bandeja pendiente está limitada a 1.000 registros. Un campo trampa filtra envíos automatizados simples. Para exposición a mayor tráfico, añadir un límite por IP en el proveedor de despliegue o un desafío antispam.
+
+La decisión y la invitación se guardan en una misma transacción con bloqueo de fila para impedir dobles aprobaciones. Solo el servidor puede acceder a las tablas y funciones. Gestión puede eliminar consultas propias mediante `meeting_account_delete_poll`, que verifica rol y propietario y borra consulta y respuestas atómicamente. Las consultas antiguas sin propietario siguen reservadas a Administración.
+
+Aplicar `supabase/account-requests.sql` antes del despliegue. Validación: `scripts/test-account-requests.mjs`, pruebas de roles y `supabase/test-account-requests.sql` bajo el rol real `service_role`, dentro de una transacción revertida. No se crean cuentas ni se envían correos reales en las pruebas.
