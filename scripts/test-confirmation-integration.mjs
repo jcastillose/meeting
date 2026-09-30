@@ -1,0 +1,36 @@
+import assert from 'node:assert/strict';
+import {managementMailer} from '../lib/notifications.ts';
+import {downloadConfirmedCalendar} from '../lib/calendar-export.ts';
+const fahu=process.cwd().endsWith('atmeet-fahu');
+const host=fahu?'https://atmeetfahu.netlify.app':'https://atmeet.netlify.app';
+const from=fahu?'at meet FAHU <atmeetfahu@contact.agencements.net>':'at meet <atmeet@contact.agencements.net>';
+const base={id:'p_'+'b'.repeat(32),title:'Confirmación, reunión FAHU',start:'2026-09-30',end:'2026-09-30',from:540,to:720,step:30,duration:90,timezone:'America/Santiago',created:'2026-09-29T12:00:00Z',closed:true,closedAt:'2026-09-30 19:26:51.824453+00',creator:{name:'Organizador',email:'creator@example.invalid'}};
+for(const mode of ['dates','week','month']){
+ const poll={...base,mode,selectedSlot:(mode==='dates'?'2026-09-30':mode==='week'?'w2':'m30')+'@570',...(mode==='dates'?{}:{selectedDate:'2026-09-30'})};
+ let emails;
+ const mailer=managementMailer({apiKey:'fixture',from,siteUrl:host},async(_,o)=>{emails=JSON.parse(o.body);return Response.json({data:[]});});
+ await mailer.group(poll,['participant@example.invalid'],'Confirmación','Detalle del encuentro','fixture-'+mode);
+ const email=emails[0];assert.equal(email.from,from);
+ const links=[...email.html.matchAll(/<a href="([^"]+)"/g)].map(m=>new URL(m[1].replace(/&amp;/g,'&')));
+ const google=links.find(u=>u.hostname==='calendar.google.com');
+ const apple=links.find(u=>u.pathname.endsWith('/calendar'));
+ assert(google&&apple);assert.equal(apple.origin,host);
+ assert.equal(google.searchParams.get('text'),poll.title);
+ assert.equal(google.searchParams.get('ctz'),'America/Santiago');
+ assert.equal(google.searchParams.get('dates'),'20260930T123000Z/20260930T140000Z');
+ assert.match(email.text,/Añadir a Google Calendar:/);assert(email.text.includes(apple.href));
+ assert(!email.html.includes('manage?'));assert.match(email.html,/Encuentro confirmado/);
+ const response=await downloadConfirmedCalendar(new Request(apple.href),{getPoll:async()=>poll},poll.id);
+ assert.equal(response.status,200);assert.match(response.headers.get('Content-Type'),/text\/calendar/);
+ assert.match(response.headers.get('Content-Disposition'),/attachment; filename="encuentro.ics"/);
+ const ics=(await response.text()).replace(/\r\n /g,'');
+ assert.match(ics,/DTSTART:20260930T123000Z/);assert.match(ics,/DTEND:20260930T140000Z/);assert.match(ics,/STATUS:CONFIRMED/);
+ const invalid=new URL(apple);invalid.searchParams.set('slot','bad@570');
+ assert.equal((await downloadConfirmedCalendar(new Request(invalid),{getPoll:async()=>poll},poll.id)).status,400);
+ assert.equal((await downloadConfirmedCalendar(new Request(apple),{getPoll:async()=>({...poll,closed:false,selectedSlot:undefined})},poll.id)).status,404);
+}
+let informational;
+const mailer=managementMailer({apiKey:'fixture',from,siteUrl:host},async(_,o)=>{informational=JSON.parse(o.body)[0];return Response.json({data:[]});});
+await mailer.group({...base,mode:'dates'},['participant@example.invalid'],'Información','Mensaje sin horario confirmado','information');
+assert.match(informational.html,/Mensaje del encuentro/);assert(!informational.html.includes('Encuentro confirmado'));assert(!informational.html.includes('calendar.google.com'));
+console.log('PASS: dates/week/month confirmation email → Google + macOS ICS, matching times/duration/timezone, per-site sender/host, invalid and reopened event handling, informational labeling');

@@ -31,6 +31,9 @@ const accountCommand=(body,account={id:'creator-account',role:'manager'})=>manag
 assert.equal((await accountCommand({action:'view'},{id:'foreign',role:'manager'})).status,403);
 assert.equal((await accountCommand({action:'view'})).status,200);
 assert.equal((await accountCommand({action:'notifications',notify:false})).status,200);
+assert.equal((await accountCommand({action:'send',notificationKind:'confirmation',subject:'Final',message:'Listo',requestId:crypto.randomUUID()})).status,409);
+assert.equal((await accountCommand({action:'send',notificationKind:'information',subject:'Aviso',message:'Información',requestId:crypto.randomUUID()})).status,200);
+assert.equal(group.at(-1)[0].selectedSlot,undefined);
 assert.equal((await accountCommand({action:'finalize',selectedSlot:'w0@540',selectedDate:'2026-10-06'})).status,400);
 assert.equal((await accountCommand({action:'finalize',selectedSlot:'w0@540',selectedDate:'2026-10-05'})).status,200);
 assert.equal(managed.closed,true);assert.equal(managed.selectedSlot,'w0@540');

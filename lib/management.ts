@@ -45,13 +45,16 @@ export async function manage(request:Request,store:Store,id:string,mailAccess?:C
    const {manageHash,...safe}=updated;return reply({poll:safe});
   }
   if(body.action==='send'){
-   if(account&&(body.selectedSlot!==poll.selectedSlot||body.selectedDate!==poll.selectedDate))return reply({error:'El horario confirmado cambió. Actualiza la página y revisa el mensaje antes de enviarlo.'},409);
+   if((body.selectedSlot!==poll.selectedSlot||body.selectedDate!==poll.selectedDate))return reply({error:'El horario confirmado cambió. Actualiza la página y revisa el mensaje antes de enviarlo.'},409);
    if(!poll.closed)return reply({error:'Cierra los registros antes de notificar al grupo.'},409);
+   const notificationKind=z.enum(['confirmation','information']).optional().parse(body.notificationKind)||(poll.selectedSlot?'confirmation':'information');
+   if(notificationKind==='confirmation'&&(!poll.selectedSlot||!validMeetingSelection(poll,poll.selectedSlot,poll.selectedDate)))return reply({error:'Selecciona y confirma el horario definitivo antes de enviar una confirmación con enlaces de calendario.'},409);
    if(!mailGroup)return reply({error:'El envío de correo no está disponible.'},503);
    const input=z.object({subject:z.string().trim().min(1).max(180).regex(/^[^\r\n]+$/),message:z.string().trim().min(1).max(5000),requestId:z.string().uuid()}).parse(body);
    const votes=await store.getVotes(id);const emails=[...new Set(votes.map(v=>v.email?.trim().toLowerCase()).filter((email):email is string=>!!email&&z.string().email().safeParse(email).success))].sort();
    if(!emails.length)return reply({error:'No hay participantes con correo registrado.'},400);
-   await mailGroup(poll,emails,input.subject,input.message,await hash(id+input.requestId+input.subject+input.message+(poll.selectedSlot||'')+(poll.selectedDate||'')));
+   const mailPoll=notificationKind==='confirmation'?poll:{...poll,selectedSlot:undefined,selectedDate:undefined};
+   await mailGroup(mailPoll,emails,input.subject,input.message,await hash(id+notificationKind+input.requestId+input.subject+input.message+(poll.selectedSlot||'')+(poll.selectedDate||'')));
    return reply({sent:emails.length});
   }
   return reply({error:'Operación no disponible.'},400);

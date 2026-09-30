@@ -81,3 +81,6 @@ Los avisos a participantes están activados por defecto. Se encolan en la misma 
 
 ### Reabrir registros
 En Administración → Gestionar y notificar → Reabrir registros. Solo se ofrece con acceso mediante cuenta: Administración en cualquier consulta y Gestión exclusivamente en consultas propias. La operación conserva respuestas, retira la selección definitiva y su fecha, incrementa la revisión y vuelve a admitir registros. Repetir la reapertura de una consulta abierta no cambia datos. No envía correos ni cancela eventos externos. Aplicar `supabase/reopen-registrations.sql` y verificar con `supabase/test-reopen-registrations.sql` (transacción revertida).
+
+### Correos y calendarios
+Notificar al grupo usa Confirmar horario por defecto: requiere un horario definitivo confirmado, y en consultas habituales también una fecha concreta compatible. La revisión muestra los enlaces Google Calendar y descarga .ics incluidos en el correo, con la duración y zona horaria del evento. Cerrar los registros sin seleccionar horario no crea una confirmación. El creador que accede por enlace privado debe gestionar con su cuenta para confirmar el evento. Solo mensaje informativo permite enviar información sin crear un evento y se identifica como tal. Prueba completa de mensaje → enlaces → ICS en `scripts/test-confirmation-integration.mjs`; no envía correos reales.
