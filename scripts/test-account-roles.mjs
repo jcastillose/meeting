@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import {scryptSync} from 'node:crypto';
 import {adminHandler,digest} from '../lib/admin-server.ts';
-import {extendSchedule} from '../lib/schedule-extension.ts';
+import {extendSchedule,replaceSchedule} from '../lib/schedule-extension.ts';
 import {handle as pollsHandler} from '../lib/api.ts';
 import {validKeys} from '../lib/domain.ts';
 const fahu=process.cwd().endsWith('atmeet-fahu'),uid='c110a833-20c6-457f-8e81-eeb803076551';
@@ -26,6 +26,7 @@ const fetcher=async(url,o={})=>{const u=new URL(url),p=u.pathname,b=o.body?JSON.
  if(p==='/rest/v1/rpc/meeting_account_history'){historyUser=b.p_user;return ok({total:1,polls:[{poll,responseCount:1}]});}
  if(p==='/rest/v1/rpc/meeting_account_delete_poll'){assert.equal(b.p_user,uid);return ok(role==='admin'||poll.ownerId===uid);}
  if(p==='/rest/v1/polls')return ok([{data:JSON.stringify(poll)}]);
+ if(p==='/rest/v1/rpc/meeting_edit_schedule'){assert.equal(b.p_user,uid);return ok({...poll,...b.p_patch,scheduleRevision:1});}
  if(p==='/rest/v1/rpc/meeting_extend_poll'){assert.equal(b.p_user,uid);patched=b;return ok({...poll,...b.p_patch,scheduleRevision:1});}
  if(p==='/rest/v1/meeting_accounts')return ok(u.searchParams.get('email')==='eq.'+user.email?[{user_id:uid}]:[]);
  if(p==='/rest/v1/meeting_password_resets')return ok(reset===u.searchParams.get('token_hash')?.slice(3)?[{user_id:uid,password_snapshot:''}]:[]);
@@ -46,6 +47,15 @@ assert.equal((await app(req('extend-poll',{...extension,revision:2},cookie))).st
 assert.equal((await app(req('delete-poll',{id:poll.id},cookie))).status,200);
 poll.ownerId='another-account';assert.equal((await app(req('delete-poll',{id:poll.id},cookie))).status,404);assert.equal((await app(req('extend-poll',extension,cookie))).status,404);
 role='admin';assert.equal((await app(req('extend-poll',extension,cookie))).status,200);role='manager';poll.ownerId=uid;
+const editInput={id:poll.id,revision:0,ranges:[{date:'2026-10-01',from:600,to:720}],notifyParticipants:false};
+assert.equal((await app(req('edit-poll',editInput,cookie))).status,200);
+poll.ownerId='another-account';assert.equal((await app(req('edit-poll',editInput,cookie))).status,404);
+role='admin';assert.equal((await app(req('edit-poll',editInput,cookie))).status,200);role='manager';poll.ownerId=uid;
+poll.closed=true;assert.equal((await app(req('edit-poll',editInput,cookie))).status,400);assert.equal((await app(req('edit-poll',{...editInput,reopen:true},cookie))).status,200);delete poll.closed;
+assert.equal((await app(req('edit-poll',{...editInput,revision:9},cookie))).status,409);
+assert.equal((await app(req('edit-poll',{...editInput,ranges:[{date:'2026-10-01',from:540,to:660}]},cookie))).status,400);
+assert.deepEqual(replaceSchedule({...poll,mode:'week'},{from:600,to:720}),{from:600,to:720});
+assert.throws(()=>replaceSchedule(poll,{ranges:[{date:'bad',from:600,to:720}]}));
 assert.throws(()=>extendSchedule(poll,{ranges:[{date:'2027-01-01',from:720,to:840}]}));
 const recurring={...poll,mode:'week'};assert.throws(()=>extendSchedule(recurring,{from:600,to:660}));assert.deepEqual(extendSchedule(recurring,{from:480,to:720}),{from:480,to:720});
 let stored;const store={createPoll:async p=>{stored=p;}};

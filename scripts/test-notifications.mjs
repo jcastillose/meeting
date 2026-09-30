@@ -35,3 +35,20 @@ assert.match(messages[0].text,/calendar.google.com/);assert.match(messages[0].te
 await confirmationMailer.requestAccount('admin@example.com',{id:'request-id',name:'Solicitante',email:'applicant@example.com',message:'Necesito acceso'},'request-test');
 assert.deepEqual(deliveryCalls[1].to,['admin@example.com']);assert.match(deliveryCalls[1].text,/applicant@example.com/);assert.match(deliveryCalls[1].text,/no concede acceso/);
 console.log('PASS: calendar confirmation buttons, escaped HTML, individual recipients and admin request notice');
+
+let scheduleMail;
+const scheduleSender=managementMailer({apiKey:'mock',from:'test@example.com',siteUrl:'https://meeting.test'},async(_,o)=>{scheduleMail=JSON.parse(o.body);return Response.json({id:'mock'});});
+await scheduleSender.schedule({...poll,scheduleRevision:2},'participant@example.com','schedule-event');
+assert.deepEqual(scheduleMail.to,['participant@example.com']);assert.match(scheduleMail.text,/actualizó/);assert.match(scheduleMail.text,/Duración/);assert.match(scheduleMail.text,/Revisar consulta/);assert(!scheduleMail.text.includes('manage'));
+console.log('PASS: schedule change notice, proposed ranges, duration, timezone and participant privacy');
+
+const {notifyScheduleChanges}=await import('../lib/schedule-notifications.ts');
+let queuedDone=false,queuedLease=false,queuedDelivered=[],queuedCalls=[];
+const scheduleRest=async(path,method,body)=>{
+ if(path==='rpc/meeting_claim_schedule_notice'){if(queuedDone||queuedLease)return null;queuedLease=true;return {id:'change-id',after_data:poll,emails:['one@example.com','two@example.com'],delivered_emails:[...queuedDelivered]};}
+ if(path==='rpc/meeting_ack_schedule_notice'){if(body.p_email)queuedDelivered.push(body.p_email);if(body.p_done)queuedDone=true;return null;}throw Error(path);
+};
+await notifyScheduleChanges(scheduleRest,async(p,email,key)=>{queuedCalls.push({email,key});if(email==='two@example.com')throw Error('mail failed');}).catch(()=>{});
+queuedLease=false;await notifyScheduleChanges(scheduleRest,async(p,email,key)=>queuedCalls.push({email,key}));
+assert.deepEqual(queuedCalls.map(x=>x.email),['one@example.com','two@example.com','two@example.com']);assert.equal(queuedCalls[1].key,queuedCalls[2].key);assert(queuedDone);
+console.log('PASS: schedule notice durable partial success and stable retry keys');

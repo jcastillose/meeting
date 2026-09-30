@@ -1,6 +1,7 @@
 import {confirmedCalendar} from './calendar-export';
 import {selectedMeetingLabel} from './selected-meeting';
 import type {VoteNotifier} from './api';
+import {clock,dayLabel,days} from './domain';
 import {pollPath} from './links';
 
 /** Server-only sender. Contact details never enter public responses. */
@@ -51,6 +52,18 @@ export function managementMailer(config:{apiKey:string;from:string;siteUrl:strin
     reset?'El enlace vence en 30 minutos y solo puede usarse una vez. Al cambiar la contraseña se cerrarán tus sesiones anteriores.':'El enlace vence en 7 días y solo puede usarse una vez. Usa el correo al que recibiste esta invitación. Los permisos dependen del tipo de cuenta asignado: administración o gestión.',
     reset?'Si no solicitaste este cambio, ignora este mensaje. Tu contraseña actual seguirá funcionando.':'Si no esperabas esta invitación, puedes ignorarla.',
     'No compartas este enlace.'
+   ].join('\n\n')},key);
+  },
+  async schedule(poll:import('./domain').Poll,email:string,key:string){
+   const ranges=poll.dailyRanges||days(poll).map(date=>({date,from:poll.from,to:poll.to}));
+   await send('/emails',{from:config.from,to:[email],subject:`at meet · Cambiaron las propuestas de ${poll.title.replace(/[\r\n]/g,' ')}`,text:[
+    `${poll.creator?.name||'Quien organiza'} actualizó los días u horarios propuestos para «${poll.title}».`,
+    'Revisa las nuevas propuestas y actualiza tu disponibilidad. Tus preferencias en los bloques que se mantienen se conservaron. Los bloques retirados ya no se consideran; los nuevos están sin responder.',
+    'Propuestas actuales:',...ranges.map(r=>dayLabel(poll,r.date)+': '+clock(r.from)+'–'+clock(r.to)),
+    'Duración: '+(poll.duration||poll.step)+' minutos · Zona horaria: '+poll.timezone,
+    'Revisar consulta: '+new URL(pollPath(poll),config.siteUrl).href,
+    'Los registros están abiertos. Si la consulta tenía un horario confirmado, esa confirmación fue retirada; recibirás un nuevo aviso cuando se defina el encuentro.',
+    'Recibes este correo porque registraste tus opciones en esta consulta.'
    ].join('\n\n')},key);
   },
   async requestAccount(email:string,input:{id:string;name:string;email:string;message:string},key:string){

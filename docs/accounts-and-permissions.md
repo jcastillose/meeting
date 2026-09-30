@@ -70,3 +70,11 @@ Aplicar `supabase/account-requests.sql` antes del despliegue. Validación: `scri
 Las solicitudes pendientes avisan exclusivamente a administradores activos; cada destinatario recibe su propio correo. Se guardan acuses por destinatario y una reserva atómica evita ejecuciones concurrentes. Un trabajador de Netlify revisa la cola cada 15 minutos, con hasta seis intentos dentro de 23 horas; los errores quedan registrados en los logs y la solicitud permanece disponible en Administración. Aplicar `supabase/request-notifications.sql` antes de desplegar.
 
 En Gestión, seleccionar el horario definitivo (y una fecha concreta para consultas habituales), confirmar el cierre y revisar el mensaje. El correo incluye título, fecha, duración y zona horaria, un enlace de Google Calendar y descarga .ics compatible con Calendario de macOS. Cada participante confirma la incorporación en su calendario. No se comparten correos de otras personas ni enlaces privados de gestión.
+
+
+### Cambiar propuestas de consultas existentes
+En Administración → Editar propuestas horarias, las fechas concretas se editan por escrito o mediante calendario. Las consultas habituales permiten ajustar su rango común. Gestión solo accede a sus consultas; Administración accede a todas. El servidor verifica propietario y revisión dentro de una transacción.
+
+Se conservan las respuestas de los bloques vigentes, se dejan sin respuesta los nuevos y se archivan las preferencias retiradas en `meeting_schedule_changes`, tabla privada sin acceso público. No se cambia la duración ni el tamaño de bloque, para mantener el significado de las respuestas. Una consulta cerrada requiere confirmar su reapertura y retirar la confirmación anterior.
+
+Los avisos a participantes están activados por defecto. Se encolan en la misma transacción que el cambio, se envían a direcciones individuales y se guardan acuses por destinatario. El trabajador existente reintenta pendientes cada 15 minutos. Una nueva edición sustituye los avisos anteriores aún pendientes. Aplicar `supabase/schedule-changes.sql` antes del despliegue y validar con `supabase/test-schedule-changes.sql`, que revierte todas sus pruebas.
