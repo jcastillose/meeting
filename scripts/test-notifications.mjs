@@ -24,3 +24,14 @@ await invitationMailer.admin('invite','invited@example.com','https://atmeet.netl
 assert.equal(inviteCalls.length,2);assert.equal(inviteCalls[0].body,inviteCalls[1].body);assert.equal(inviteCalls[0].headers['Idempotency-Key'],inviteCalls[1].headers['Idempotency-Key']);
 const invitationPayload=JSON.parse(inviteCalls[0].body);assert.deepEqual(invitationPayload.to,['invited@example.com']);assert.equal(invitationPayload.from,'at meet <atmeet@contact.agencements.net>');assert.match(invitationPayload.text,/7 días/);assert.match(invitationPayload.text,/https:\/\/atmeet.netlify.app\/admin#invite=/);
 console.log('PASS: invitation recipient, sender, private link, expiry and idempotent retry');
+
+const deliveryCalls=[];
+const confirmationMailer=managementMailer({apiKey:'secret',from:'test@example.com',siteUrl:'https://meeting.test'},async(url,options)=>{deliveryCalls.push(JSON.parse(options.body));return Response.json({id:'mock'});});
+const selected={...poll,closed:true,selectedSlot:'w2@540',selectedDate:'2026-09-30',duration:60};
+await confirmationMailer.group(selected,['one@example.com','two@example.com'],'Confirmación','Enlace <seguro> & detalle','confirmed-test');
+const messages=deliveryCalls[0];assert.equal(messages.length,2);assert.deepEqual(messages[0].to,['one@example.com']);
+assert.match(messages[0].html,/Añadir a Google Calendar/);assert.match(messages[0].html,/Calendario de macOS/);assert.match(messages[0].html,/&lt;seguro&gt; &amp; detalle/);
+assert.match(messages[0].text,/calendar.google.com/);assert.match(messages[0].text,/slot=w2%40540/);assert(!messages[0].text.includes('two@example.com'));
+await confirmationMailer.requestAccount('admin@example.com',{id:'request-id',name:'Solicitante',email:'applicant@example.com',message:'Necesito acceso'},'request-test');
+assert.deepEqual(deliveryCalls[1].to,['admin@example.com']);assert.match(deliveryCalls[1].text,/applicant@example.com/);assert.match(deliveryCalls[1].text,/no concede acceso/);
+console.log('PASS: calendar confirmation buttons, escaped HTML, individual recipients and admin request notice');

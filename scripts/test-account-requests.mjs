@@ -14,3 +14,16 @@ assert.equal((await review('admin',{id,decision:'approve',role:'admin'})).status
 pending=true;await review('admin',{id,decision:'reject'});assert.equal(mails.length,1);
 pending=true;const fallback=await reviewAccountRequests('review-request','POST',{id,decision:'approve',role:'admin'},url,{id:uid},'admin',rest,async()=>{throw Error('mail unavailable');});assert.equal(fallback.data.emailSent,false);assert.match(fallback.data.url,/#invite=[a-f0-9]{64}$/);
 console.log('PASS: public validation, ignored self-assigned roles, admin-only review, paging, single approval, rejection and mail fallback');
+
+const {notifyAccountRequests}=await import('../lib/request-notifications.ts');
+let done=false,leased=false,delivered=[],noticeCalls=[];
+const notificationRest=async(path,method,body)=>{
+ if(path==='rpc/meeting_claim_request_notice'){if(done||leased)return null;leased=true;return {id,name:'Applicant',email:'applicant@example.com',message:'Request',delivered_emails:[...delivered]};}
+ if(path==='rpc/meeting_ack_request_notice'){if(body.p_email)delivered.push(body.p_email);if(body.p_done)done=true;return null;}throw Error(path);
+};
+await notifyAccountRequests(notificationRest,async()=>['admin1@example.com','admin2@example.com','admin1@example.com'],async(email)=>{noticeCalls.push(email);if(email==='admin2@example.com')throw Error('provider failure');}).catch(()=>{});
+assert.deepEqual(delivered,['admin1@example.com']);leased=false;
+await notifyAccountRequests(notificationRest,async()=>['admin1@example.com','admin2@example.com'],async(email)=>noticeCalls.push(email));
+await notifyAccountRequests(notificationRest,async()=>['admin1@example.com'],async(email)=>noticeCalls.push(email));
+assert.deepEqual(noticeCalls,['admin1@example.com','admin2@example.com','admin2@example.com']);assert(done);
+console.log('PASS: durable partial delivery, distinct admins, pending retry and completed deduplication');

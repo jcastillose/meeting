@@ -1,3 +1,5 @@
+import {pollPath} from './links';
+import {validMeetingSelection} from './selected-meeting';
 import {add,meetingFits,type Poll} from './domain';
 
 const text=(value:string)=>value.replace(/\\/g,'\\\\').replace(/\r\n|\r|\n/g,'\\n').replace(/;/g,'\\;').replace(/,/g,'\\,');
@@ -28,4 +30,26 @@ export function calendarEvent(poll:Poll,key:string,link:string,now=new Date()):s
     `UID:${poll.id}-${day}-${minute}@atmeet.netlify.app`,`DTSTAMP:${stamp(now)}`,`DTSTART:${stamp(start)}`,`DTEND:${stamp(end)}`,
     `SUMMARY:${text(poll.title)}`,`DESCRIPTION:${text('Horario propuesto en at meet. Zona horaria: '+poll.timezone+'\nConsulta: '+link)}`,
     'STATUS:TENTATIVE','END:VEVENT','END:VCALENDAR'].map(fold).join('\r\n')+'\r\n';
+}
+
+export function confirmedCalendar(poll:Poll,link:string,message=''){
+ if(!poll.selectedSlot||!validMeetingSelection(poll,poll.selectedSlot,poll.selectedDate))throw Error('Confirma una fecha y un horario válidos antes de compartir el evento.');
+ const [day,minute]=poll.selectedSlot.split('@'),concreteDay=poll.mode==='dates'?day:poll.selectedDate!;
+ const concrete:Poll={...poll,mode:'dates',start:concreteDay,end:concreteDay,dailyRanges:poll.dailyRanges?.filter(r=>r.date===day).map(r=>({...r,date:concreteDay}))};
+ const start=zonedInstant(concreteDay,+minute,poll.timezone),end=zonedInstant(concreteDay,+minute+(poll.duration||poll.step),poll.timezone);
+ if(end<=start)throw Error('El horario coincide con un cambio de hora.');
+ const google=new URL('https://calendar.google.com/calendar/render');
+ google.search=new URLSearchParams({action:'TEMPLATE',text:poll.title,dates:stamp(start)+'/'+stamp(end),ctz:poll.timezone,details:message+'\nConsulta: '+link}).toString();
+ const ics=calendarEvent(concrete,concreteDay+'@'+minute,link,new Date(poll.closedAt||poll.created)).replace('STATUS:TENTATIVE','STATUS:CONFIRMED');
+ return {google:google.href,ics};
+}
+export async function downloadConfirmedCalendar(request:Request,store:{getPoll:(id:string)=>Promise<Poll|undefined|null>},id:string){
+ if(request.method!=='GET')return new Response(null,{status:405,headers:{Allow:'GET'}});
+ const poll=await store.getPoll(id);
+ if(!poll?.closed||!poll.selectedSlot)return new Response('Evento confirmado no disponible.',{status:404});
+ try{const url=new URL(request.url),slot=url.searchParams.get('slot'),day=url.searchParams.get('date');
+ const snapshot=slot?{...poll,selectedSlot:slot,selectedDate:day||undefined}:poll;
+ const {ics}=confirmedCalendar(snapshot,new URL(pollPath(poll),request.url).href);
+ return new Response(ics,{headers:{'Content-Type':'text/calendar; charset=utf-8','Content-Disposition':'attachment; filename="encuentro.ics"','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'}});
+ }catch{return new Response('Fecha u horario inválido.',{status:400});}
 }

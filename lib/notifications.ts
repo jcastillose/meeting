@@ -1,3 +1,4 @@
+import {confirmedCalendar} from './calendar-export';
 import {selectedMeetingLabel} from './selected-meeting';
 import type {VoteNotifier} from './api';
 import {pollPath} from './links';
@@ -29,6 +30,7 @@ export function resendNotifier(config:{apiKey:string;from:string;siteUrl:string}
   throw Error('Email delivery failed');
  };
 }
+const escapeHtml=(value:string)=>value.replace(/[&<>\"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',"'":'&#39;'}[c]!));
 class PermanentDeliveryError extends Error{}
 
 export function managementMailer(config:{apiKey:string;from:string;siteUrl:string},fetcher:typeof fetch=fetch){
@@ -51,13 +53,29 @@ export function managementMailer(config:{apiKey:string;from:string;siteUrl:strin
     'No compartas este enlace.'
    ].join('\n\n')},key);
   },
+  async requestAccount(email:string,input:{id:string;name:string;email:string;message:string},key:string){
+   await send('/emails',{from:config.from,to:[email],subject:'at meet · Nueva solicitud de cuenta',text:[
+    'Se recibió una nueva solicitud de cuenta.', 'Nombre: '+input.name,'Correo: '+input.email,
+    ...(input.message?['Mensaje: '+input.message]:[]),
+    'Revisa la solicitud y asigna acceso de gestión o administración: '+new URL('/admin',config.siteUrl).href,
+    'La solicitud no concede acceso por sí sola.'
+   ].join('\n\n')},key);
+  },
   async access(poll:import('./domain').Poll,token:string){
    const {managementPath}=await import('./api');
    await send('/emails',{from:config.from,to:[poll.creator!.email],subject:`at meet · Gestiona tu consulta: ${poll.title.replace(/[\r\n]/g,' ')}`,text:`Hola, ${poll.creator!.name}:\n\nEste enlace privado permite cerrar los registros y enviar un mensaje a quienes respondieron:\n${new URL(managementPath(poll.id,token),config.siteUrl).href}\n\nGuárdalo y no lo compartas con participantes.\n\nPara compartir la consulta, usa este otro enlace:\n${new URL(pollPath(poll),config.siteUrl).href}\n\nLos avisos de nuevas respuestas están ${poll.creator!.notify===false?'desactivados':'activados'}. Puedes cambiarlo en la gestión de la consulta.`},`creator-access/${poll.id}/${token}`);
   },
   async group(poll:import('./domain').Poll,emails:string[],subject:string,message:string,key:string){
+   const link=new URL(pollPath(poll),config.siteUrl).href;
+   const calendar=poll.selectedSlot?confirmedCalendar(poll,link,message):undefined;
+   const calendarDownload=new URL('/api/polls/'+poll.id+'/calendar',config.siteUrl);
+   if(poll.selectedSlot)calendarDownload.searchParams.set('slot',poll.selectedSlot);
+   if(poll.selectedDate)calendarDownload.searchParams.set('date',poll.selectedDate);
+   const calendarUrl=calendarDownload.href;
+   const text=`${poll.creator?.name||'Quien organiza'} envía este mensaje sobre «${poll.title}»:\n\n${poll.selectedSlot?'Horario seleccionado: '+selectedMeetingLabel(poll)+'\n\n':''}${message}\n\nConsulta cerrada: ${link}`+(calendar?`\n\nAñadir a Google Calendar: ${calendar.google}\nAñadir a Calendario de macOS (.ics): ${calendarUrl}`:'')+'\n\nRecibes este correo porque registraste tu disponibilidad en esta consulta.';
+   const html=`<!doctype html><html lang="es"><body style="font-family:Arial,sans-serif;color:#253a34;background:#f4f7f5;padding:24px"><main style="max-width:560px;margin:auto;background:white;border-radius:16px;padding:28px"><p>at meet · Encuentro confirmado</p><h1 style="font-size:24px">${escapeHtml(poll.title)}</h1>${calendar?`<p style="padding:16px;background:#edf5f1;border-radius:12px"><strong>${escapeHtml(selectedMeetingLabel(poll))}</strong></p>`:''}<p style="white-space:pre-wrap">${escapeHtml(message).replace(/\n/g,'<br>')}</p>${calendar?`<p><a href="${escapeHtml(calendar.google)}" style="display:inline-block;padding:12px 18px;background:#28634e;color:white;border-radius:8px;text-decoration:none">Añadir a Google Calendar</a></p><p><a href="${escapeHtml(calendarUrl)}" style="display:inline-block;padding:12px 18px;border:1px solid #28634e;color:#28634e;border-radius:8px;text-decoration:none">Añadir a Calendario de macOS</a></p><p>Abre el archivo .ics en Calendario y confirma su incorporación.</p>`:''}<p><a href="${escapeHtml(link)}">Ver consulta</a></p><p style="font-size:12px;color:#59655f">Recibes este correo porque registraste tu disponibilidad. Las direcciones de las demás personas no se comparten.</p></main></body></html>`;
    for(let offset=0;offset<emails.length;offset+=100){
-    const batch=emails.slice(offset,offset+100).map(email=>({from:config.from,to:[email],subject:`at meet · ${subject}`,text:`${poll.creator?.name||'Quien organiza'} envía este mensaje sobre «${poll.title}»:\n\n${poll.selectedSlot?'Horario seleccionado: '+selectedMeetingLabel(poll)+'\n\n':''}${message}\n\nConsulta cerrada: ${new URL(pollPath(poll),config.siteUrl).href}\n\nRecibes este correo porque registraste tu disponibilidad en esta consulta.`}));
+    const batch=emails.slice(offset,offset+100).map(email=>({from:config.from,to:[email],subject:`at meet · ${subject}`,text,html}));
     await send('/emails/batch',batch,`meeting-message/${key}/${offset}`);
    }
   }

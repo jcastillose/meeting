@@ -64,3 +64,9 @@ El correo se verifica al utilizar la invitación. Las solicitudes no deben consi
 La decisión y la invitación se guardan en una misma transacción con bloqueo de fila para impedir dobles aprobaciones. Solo el servidor puede acceder a las tablas y funciones. Gestión puede eliminar consultas propias mediante `meeting_account_delete_poll`, que verifica rol y propietario y borra consulta y respuestas atómicamente. Las consultas antiguas sin propietario siguen reservadas a Administración.
 
 Aplicar `supabase/account-requests.sql` antes del despliegue. Validación: `scripts/test-account-requests.mjs`, pruebas de roles y `supabase/test-account-requests.sql` bajo el rol real `service_role`, dentro de una transacción revertida. No se crean cuentas ni se envían correos reales en las pruebas.
+
+
+### Correos de solicitudes y confirmación
+Las solicitudes pendientes avisan exclusivamente a administradores activos; cada destinatario recibe su propio correo. Se guardan acuses por destinatario y una reserva atómica evita ejecuciones concurrentes. Un trabajador de Netlify revisa la cola cada 15 minutos, con hasta seis intentos dentro de 23 horas; los errores quedan registrados en los logs y la solicitud permanece disponible en Administración. Aplicar `supabase/request-notifications.sql` antes de desplegar.
+
+En Gestión, seleccionar el horario definitivo (y una fecha concreta para consultas habituales), confirmar el cierre y revisar el mensaje. El correo incluye título, fecha, duración y zona horaria, un enlace de Google Calendar y descarga .ics compatible con Calendario de macOS. Cada participante confirma la incorporación en su calendario. No se comparten correos de otras personas ni enlaces privados de gestión.

@@ -1,3 +1,4 @@
+import {notifyAccountRequests,type RequestMailer} from './request-notifications';
 import {submitAccountRequest,reviewAccountRequests} from './account-requests';
 import {extendSchedule} from './schedule-extension';
 import {z} from 'zod';
@@ -7,12 +8,12 @@ const inviteToken=z.string().regex(/^[a-f0-9]{64}$/);
 const secret=()=>Array.from(crypto.getRandomValues(new Uint8Array(32)),b=>b.toString(16).padStart(2,'0')).join('');
 export async function digest(value:string){return Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(value))),b=>b.toString(16).padStart(2,'0')).join('');}
 class HttpError extends Error {constructor(public status:number,message:string){super(message);}}
-type AdminUser={id:string;email?:string;updated_at?:string;app_metadata?:Record<string,unknown>};
+type AdminUser={id:string;email?:string;updated_at?:string;banned_until?:string;app_metadata?:Record<string,unknown>};
 
 const accountRole=(user:AdminUser)=>user?.app_metadata?.meeting_admin===true?'admin':user?.app_metadata?.meeting_role==='manager'?'manager':null;
 export type AdminMailer=(kind:'invite'|'reset',email:string,url:string,key:string)=>Promise<void>;
 export type InvitationMailer=AdminMailer;
-export function adminHandler(url:string,key:string,fetcher:typeof fetch=fetch,mailer?:InvitationMailer){
+export function adminHandler(url:string,key:string,fetcher:typeof fetch=fetch,mailer?:InvitationMailer,requestMailer?:RequestMailer){
   const root=url.replace(/\/$/,'');
   async function call(path:string,method='GET',body?:unknown,bearer=key){
     const r=await fetcher(root+path,{method,headers:{apikey:key,Authorization:`Bearer ${bearer}`,'Content-Type':'application/json'},body:body===undefined?undefined:JSON.stringify(body)});
@@ -22,6 +23,12 @@ export function adminHandler(url:string,key:string,fetcher:typeof fetch=fetch,ma
   }
   const rest=(path:string,method='GET',body?:unknown)=>call('/rest/v1/'+path,method,body);
   const syncAccount=(user:AdminUser)=>rest('rpc/meeting_sync_account','POST',{p_user:user.id,p_email:user.email,p_role:accountRole(user),p_version:user.updated_at||''});
+  const notifyRequests=(email?:string)=>notifyAccountRequests(rest,async()=>{
+    const rows=await rest('meeting_accounts?role=eq.admin&select=user_id');
+    const emails:string[]=[];
+    for(const row of rows){const user:AdminUser=await call('/auth/v1/admin/users/'+encodeURIComponent(row.user_id));if(accountRole(user)==='admin'&&user.email&&(!user.banned_until||new Date(user.banned_until).getTime()<=Date.now()))emails.push(user.email.toLowerCase());}
+    return emails;
+  },requestMailer,email);
   return async function handler(request:Request):Promise<Response>{
     const current=new URL(request.url),secure=current.protocol==='https:',cookieName=secure?'__Host-meeting-admin':'meeting-admin';
     const responseHeaders=new Headers({'Cache-Control':'no-store','X-Content-Type-Options':'nosniff'});
@@ -46,6 +53,7 @@ export function adminHandler(url:string,key:string,fetcher:typeof fetch=fetch,ma
       return {user,hash};
     }
     try{
+      if(request.headers.get('X-Atmeet-Notice-Worker')===key){await notifyRequests();return reply({processed:true});}
       const path=current.pathname.replace(/^\/api\/admin\/?/,'');
       if(request.method!=='GET'){
         if(request.headers.get('origin')!==current.origin)throw new HttpError(403,'Origen no permitido.');
@@ -56,7 +64,7 @@ export function adminHandler(url:string,key:string,fetcher:typeof fetch=fetch,ma
         const raw=await request.text();if(raw.length>40000)throw new HttpError(413,'Solicitud demasiado grande.');
         try{body=JSON.parse(raw);}catch{throw new HttpError(400,'Formato no permitido.');}
       }
-      if(path==='request-account'&&request.method==='POST'){const result=await submitAccountRequest(body,rest);return reply(result.data,result.status);}
+      if(path==='request-account'&&request.method==='POST'){const result=await submitAccountRequest(body,rest);if(result.status===202&&!(body as {website?:string}).website){try{await notifyRequests((body as {email:string}).email.trim().toLowerCase());}catch{console.error('Account request saved; notice pending');}}return reply(result.data,result.status);}
       if(path==='forgot-password'&&request.method==='POST'){
         const {email}=credentials.pick({email:true}).parse(body);
         if(!mailer)throw new HttpError(503,'El envío de correos no está disponible.');

@@ -15,3 +15,11 @@ const long=calendarEvent({...p,title:'á😊'.repeat(60)},'2026-09-22@540','http
 for(const line of long.split('\r\n'))assert(Buffer.byteLength(line)<=75);
 assert(long.replace(/\r\n /g,'').includes('SUMMARY:'+'á😊'.repeat(60)));
 console.log('PASS: timezone, winter/summer, midnight, DST gaps/overlaps, escaping, UTF-8 folding and date validation.');
+
+const {confirmedCalendar,downloadConfirmedCalendar}=await import('../lib/calendar-export.ts');
+const confirmedPoll={id:'p_'+'a'.repeat(32),title:'Reunión',mode:'week',start:'2026-09-30',end:'2026-09-30',from:540,to:720,step:30,duration:60,timezone:'America/Santiago',created:'2026-09-30T12:00:00Z',closed:true,selectedSlot:'w2@540',selectedDate:'2026-09-30'};
+const confirmation=confirmedCalendar(confirmedPoll,'https://meeting.test/r/meeting');assert.match(confirmation.ics,/STATUS:CONFIRMED/);assert.match(confirmation.ics,/DTSTART:20260930T120000Z/);assert.match(confirmation.google,/ctz=America%2FSantiago/);
+assert.throws(()=>confirmedCalendar({...confirmedPoll,selectedDate:'2026-10-01'},'https://meeting.test'));
+const download=await downloadConfirmedCalendar(new Request('https://meeting.test/api/polls/'+confirmedPoll.id+'/calendar'),{getPoll:async()=>confirmedPoll},confirmedPoll.id);assert.equal(download.status,200);assert.match(download.headers.get('Content-Type'),/text\/calendar/);
+assert.equal((await downloadConfirmedCalendar(new Request('https://meeting.test/calendar'),{getPoll:async()=>({...confirmedPoll,closed:false})},confirmedPoll.id)).status,404);
+console.log('PASS: abstract meeting concrete date, UTC, confirmed ICS download and invalid selection rejection');
