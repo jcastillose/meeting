@@ -1,0 +1,12 @@
+import assert from 'node:assert/strict';
+import {initialPreferenceLayer,retainProposedSlots} from '../lib/availability-draft.ts';
+const poll={id:'test',title:'Test',mode:'dates',start:'2026-09-30',end:'2026-10-01',from:540,to:660,step:60,duration:60,timezone:'America/Santiago',created:''};
+assert.equal(initialPreferenceLayer(poll),'mine');
+assert.equal(initialPreferenceLayer({...poll,closed:true}),'group');
+const draft={'2026-09-30@540':'yes','2026-10-01@600':'maybe'};
+assert.equal(retainProposedSlots(draft,poll),draft);
+const revised={...poll,dailyRanges:[{date:'2026-10-01',from:600,to:660}]};
+assert.deepEqual(retainProposedSlots(draft,revised),{'2026-10-01@600':'maybe'});
+assert.deepEqual(draft,{'2026-09-30@540':'yes','2026-10-01@600':'maybe'});
+assert.deepEqual(retainProposedSlots(draft,{...poll,from:720,to:780}),{});
+console.log('Availability drafts: open/closed layer and schedule reconciliation passed');
