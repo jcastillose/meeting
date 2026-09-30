@@ -1,3 +1,4 @@
+import {extendSchedule} from './schedule-extension';
 import {z} from 'zod';
 
 const credentials=z.object({email:z.string().email().max(254).transform(v=>v.toLowerCase().trim()),password:z.string().min(1).max(128)});
@@ -7,7 +8,9 @@ export async function digest(value:string){return Array.from(new Uint8Array(awai
 class HttpError extends Error {constructor(public status:number,message:string){super(message);}}
 type AdminUser={id:string;email?:string;app_metadata?:Record<string,unknown>};
 
-export type InvitationMailer=(email:string,url:string,key:string)=>Promise<void>;
+const accountRole=(user:AdminUser)=>user?.app_metadata?.meeting_admin===true?'admin':user?.app_metadata?.meeting_role==='manager'?'manager':null;
+export type AdminMailer=(kind:'invite'|'reset',email:string,url:string,key:string)=>Promise<void>;
+export type InvitationMailer=AdminMailer;
 export function adminHandler(url:string,key:string,fetcher:typeof fetch=fetch,mailer?:InvitationMailer){
   const root=url.replace(/\/$/,'');
   async function call(path:string,method='GET',body?:unknown,bearer=key){
@@ -35,7 +38,7 @@ export function adminHandler(url:string,key:string,fetcher:typeof fetch=fetch,ma
       const rows=await rest(`meeting_admin_sessions?token_hash=eq.${hash}&expires_at=gt.${encodeURIComponent(new Date().toISOString())}&select=user_id`);
       if(!rows?.[0])throw new HttpError(401,'Tu sesión terminó. Vuelve a iniciar sesión.');
       const user:AdminUser=await call('/auth/v1/admin/users/'+encodeURIComponent(rows[0].user_id));
-      if(user.app_metadata?.meeting_admin!==true)throw new HttpError(403,'Esta cuenta no tiene acceso de administración.');
+      if(!accountRole(user))throw new HttpError(403,'Esta cuenta no tiene acceso de administración.');
       return {user,hash};
     }
     try{
@@ -46,8 +49,24 @@ export function adminHandler(url:string,key:string,fetcher:typeof fetch=fetch,ma
       }
       let body:unknown={};
       if(request.method==='POST'){
-        const raw=await request.text();if(raw.length>12000)throw new HttpError(413,'Solicitud demasiado grande.');
+        const raw=await request.text();if(raw.length>40000)throw new HttpError(413,'Solicitud demasiado grande.');
         try{body=JSON.parse(raw);}catch{throw new HttpError(400,'Formato no permitido.');}
+      }
+      if(path==='forgot-password'&&request.method==='POST'){
+        const {email}=credentials.pick({email:true}).parse(body);
+        if(!mailer)throw new HttpError(503,'El envío de correos no está disponible.');
+        const token=secret(),hash=await digest(token);
+        const issued=await rest('rpc/meeting_issue_reset','POST',{p_email:email,p_hash:hash});
+        if(issued){try{await mailer('reset',email,current.origin+'/admin#reset='+token,'account-reset/'+hash);}catch{console.error('Account recovery email delivery failed');}}
+        return reply({message:'Si existe una cuenta activa con ese correo, recibirás un enlace para recuperar tu contraseña.'});
+      }
+      if(path==='reset-password'&&request.method==='POST'){
+        const input=z.object({token:inviteToken,password:z.string().min(12).max(128)}).parse(body);
+        const uid=await rest('rpc/meeting_claim_reset','POST',{p_hash:await digest(input.token)});
+        if(!uid)throw new HttpError(400,'El enlace no es válido, ha vencido o ya fue utilizado. Solicita uno nuevo.');
+        await call('/auth/v1/admin/users/'+encodeURIComponent(uid),'PUT',{password:input.password});
+        await rest(`meeting_admin_sessions?user_id=eq.${uid}`,'DELETE');
+        cookie('',0);return reply({ok:true});
       }
       if(path==='login'&&request.method==='POST'){
         const input=credentials.parse(body);
@@ -56,8 +75,8 @@ export function adminHandler(url:string,key:string,fetcher:typeof fetch=fetch,ma
         const user:AdminUser=auth.user;
         // The Supabase token never leaves the server. Our opaque session is revocable.
         await call('/auth/v1/logout?scope=local','POST',undefined,auth.access_token);
-        if(user?.app_metadata?.meeting_admin!==true)throw new HttpError(403,'Esta cuenta no tiene acceso de administración.');
-        await session(user);return reply({email:user.email});
+        if(!accountRole(user))throw new HttpError(403,'Esta cuenta no tiene acceso de administración.');
+        await session(user);return reply({id:user.id,email:user.email,role:accountRole(user)});
       }
       if(path==='accept'&&request.method==='POST'){
         const input=credentials.extend({token:inviteToken,password:z.string().min(12).max(128)}).parse(body);
@@ -65,16 +84,16 @@ export function adminHandler(url:string,key:string,fetcher:typeof fetch=fetch,ma
         // Verify the recipient before atomically consuming the invitation.
         const invitations=await rest(`meeting_admin_invitations?token_hash=eq.${hash}&used_at=is.null&expires_at=gt.${encodeURIComponent(new Date().toISOString())}&select=email`);
         if(!invitations?.[0]||(invitations[0].email&&invitations[0].email!==input.email))throw new HttpError(400,'La invitación no es válida, ha vencido o corresponde a otro correo.');
-        const claimed=await rest('rpc/meeting_claim_invitation','POST',{p_hash:hash,p_claim:claim});
+        const claimed=await rest('rpc/meeting_claim_account_invitation','POST',{p_hash:hash,p_claim:claim});
         if(!claimed?.[0])throw new HttpError(400,'La invitación ya fue utilizada o venció.');
         let user:AdminUser;
         try{
-          user=await call('/auth/v1/admin/users','POST',{email:input.email,password:input.password,email_confirm:true,app_metadata:{meeting_admin:true}});
+          user=await call('/auth/v1/admin/users','POST',{email:input.email,password:input.password,email_confirm:true,app_metadata:{meeting_admin:claimed[0].role==='admin',meeting_role:claimed[0].role}});
         }catch{
           await rest(`meeting_admin_invitations?token_hash=eq.${hash}&claim_id=eq.${claim}`,'PATCH',{used_at:null,claim_id:null});
           throw new HttpError(400,'No se pudo crear la cuenta. Puede que el correo ya esté registrado o la contraseña no cumpla los requisitos.');
         }
-        await session(user);return reply({email:user.email},201);
+        await session(user);return reply({id:user.id,email:user.email,role:accountRole(user)},201);
       }
       if(path==='logout'&&request.method==='POST'){
         const raw=request.headers.get('cookie')?.split(';').map(s=>s.trim()).find(s=>s.startsWith(cookieName+'='))?.slice(cookieName.length+1);
@@ -82,13 +101,25 @@ export function adminHandler(url:string,key:string,fetcher:typeof fetch=fetch,ma
         cookie('',0);return reply({ok:true});
       }
       const {user}=await signedIn();
-      if(path==='me'&&request.method==='GET')return reply({email:user.email});
+      if(path==='me'&&request.method==='GET')return reply({id:user.id,email:user.email,role:accountRole(user)});
       if(path==='history'&&request.method==='GET'){
         const offset=z.coerce.number().int().min(0).max(1000000).parse(current.searchParams.get('offset')||0);
         const search=z.string().max(120).parse(current.searchParams.get('search')||'');
-        return reply(await rest('rpc/meeting_history','POST',{p_offset:offset,p_search:search}));
+        return reply(await rest('rpc/meeting_account_history','POST',{p_user:user.id,p_offset:offset,p_search:search}));
+      }
+      if(path==='extend-poll'&&request.method==='POST'){
+        const input=z.object({id:z.string().regex(/^p_[a-f0-9]{32}$/),revision:z.number().int().min(0),ranges:z.array(z.object({date:z.string(),from:z.number(),to:z.number()})).max(256).optional(),from:z.number().optional(),to:z.number().optional()}).parse(body);
+        const rows=await rest(`polls?id=eq.${input.id}&select=data`);
+        const poll=rows?.[0]?JSON.parse(rows[0].data):null;
+        if(!poll||(accountRole(user)!=='admin'&&poll.ownerId!==user.id))throw new HttpError(404,'Consulta no disponible para esta cuenta.');
+        if((poll.scheduleRevision||0)!==input.revision)throw new HttpError(409,'La consulta cambió. Actualiza el historial antes de editar.');
+        let patch;try{patch=extendSchedule(poll,input);}catch(e){throw new HttpError(400,(e as Error).message);}
+        const updated=await rest('rpc/meeting_extend_poll','POST',{p_user:user.id,p_id:input.id,p_revision:input.revision,p_patch:patch});
+        if(!updated)throw new HttpError(404,'Consulta no disponible para esta cuenta.');
+        return reply({poll:updated});
       }
       if(path==='delete-poll'&&request.method==='POST'){
+        if(accountRole(user)!=='admin')throw new HttpError(403,'Solo administración puede eliminar consultas.');
         const parsed=z.object({id:z.string().regex(/^p_[a-f0-9]{32}$/)}).safeParse(body);
         if(!parsed.success)throw new HttpError(400,'El identificador de la consulta no es válido.');
         const deleted=await rest('rpc/meeting_delete_poll','POST',{p_id:parsed.data.id});
@@ -96,11 +127,13 @@ export function adminHandler(url:string,key:string,fetcher:typeof fetch=fetch,ma
         return reply({ok:true});
       }
       if(path==='invitations'&&request.method==='POST'){
+        if(accountRole(user)!=='admin')throw new HttpError(403,'Solo administración puede crear cuentas.');
+        const role=z.object({role:z.enum(['admin','manager']).default('manager')}).parse(body).role;
         const {email}=credentials.pick({email:true}).parse(body),token=secret();
-        await rest('meeting_admin_invitations','POST',{token_hash:await digest(token),email,created_by:user.id});
+        await rest('meeting_admin_invitations','POST',{token_hash:await digest(token),email,role,created_by:user.id});
         const invitationUrl=current.origin+'/admin#invite='+token;
         let emailSent=false;
-        if(mailer){try{await mailer(email,invitationUrl,'admin-invite/'+await digest(token));emailSent=true;}catch{console.error('Admin invitation email delivery failed');}}
+        if(mailer){try{await mailer('invite',email,invitationUrl,'admin-invite/'+await digest(token));emailSent=true;}catch{console.error('Admin invitation email delivery failed');}}
         return reply({url:invitationUrl,expiresInDays:7,emailSent},201);
       }
       if(path==='password'&&request.method==='POST'){

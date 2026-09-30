@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { execFileSync } from "node:child_process";
 const dir = await mkdtemp(join(tmpdir(), "atmeet-schedule-"));
 try {
-  for (const name of ["schedule-editor", "daily-ranges", "calendar-export", "performance"]) {
+  for (const name of ["schedule-editor", "daily-ranges", "calendar-export", "performance", "account-roles", "admin", "notifications", "management"]) {
     const outfile = join(dir, name + ".mjs");
     await build({
       entryPoints: ["scripts/test-" + name + ".mjs"],

@@ -18,6 +18,7 @@ import { add, clock, modes, type Mode, type Poll } from "@/lib/domain";
 import { scheduleErrors } from "@/lib/schedule";
 import { DailyRangesEditor } from "@/components/daily-ranges-editor";
 export type PollCreationDialogProps = {
+  accountEmail?: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   form: Poll;
@@ -64,6 +65,7 @@ export function PollCreationDialog({
   dirty,
   onSubmit,
   notificationEmail,
+  accountEmail,
 }: PollCreationDialogProps) {
   const invalidSchedule =
     !!form.dailyRanges &&
@@ -92,7 +94,7 @@ export function PollCreationDialog({
         >
           <fieldset disabled={busy} className="creation-fields">
             <fieldset className="creator-fields">
-              <legend>Quién crea la consulta</legend>
+              <legend>Quién crea la consulta</legend>{accountEmail&&<p className="small muted">Consulta vinculada a tu cuenta: <strong>{accountEmail}</strong>. Podrás ampliarla desde tu historial.</p>}
               <p className="muted small">
                 Tus datos de contacto no se mostrarán en el calendario público.
                 No necesitas crear una cuenta.
@@ -120,6 +122,7 @@ export function PollCreationDialog({
                 Correo electrónico del creador
                 <input
                   type="email"
+                  readOnly={!!accountEmail}
                   required
                   autoComplete="email"
                   aria-describedby="creator-email-notice"

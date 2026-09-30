@@ -24,3 +24,17 @@ await command({action:'request-access'});assert.equal((await command({action:'vi
 let requests=[];const mailer=managementMailer({apiKey:'test',from:'at meet <test@example.com>',siteUrl:base},async(url,init)=>{requests.push({url,body:JSON.parse(init.body),headers:init.headers});return Response.json({data:[]})});
 await mailer.group(polls.get(id),['a@example.com','b@example.com'],'Final','Hola','same-key');assert.equal(requests[0].body.length,2);assert.deepEqual(requests[0].body[0].to,['a@example.com']);assert(!JSON.stringify(requests[0].body[0]).includes('b@example.com'));
 console.log('PASS: opt-out, creator mail, owner authentication, CSRF, private emails, closed/racing writes rejected, group gate, recipient isolation and access recovery');
+
+const managed=polls.get(id);managed.ownerId='creator-account';
+store.accountManage=async(uid,pid,action,notify,slot,date)=>{const p=polls.get(pid);if(uid!==p.ownerId)return null;if(action==='finalize'){p.selectedSlot=slot;p.selectedDate=date;p.closed=true;}else if(action==='close')p.closed=true;else p.creator.notify=notify;return p;};
+const accountCommand=(body,account={id:'creator-account',role:'manager'})=>manage(request('/api/polls/'+id+'/manage',body),store,id,undefined,async(...args)=>group.push(args),account);
+assert.equal((await accountCommand({action:'view'},{id:'foreign',role:'manager'})).status,403);
+assert.equal((await accountCommand({action:'view'})).status,200);
+assert.equal((await accountCommand({action:'notifications',notify:false})).status,200);
+assert.equal((await accountCommand({action:'finalize',selectedSlot:'w0@540',selectedDate:'2026-10-06'})).status,400);
+assert.equal((await accountCommand({action:'finalize',selectedSlot:'w0@540',selectedDate:'2026-10-05'})).status,200);
+assert.equal(managed.closed,true);assert.equal(managed.selectedSlot,'w0@540');
+assert.equal((await accountCommand({action:'send',subject:'Final',message:'Listo',requestId:crypto.randomUUID()})).status,409);
+assert.equal((await accountCommand({action:'send',subject:'Final',message:'Listo',selectedSlot:'w0@540',selectedDate:'2026-10-05',requestId:crypto.randomUUID()})).status,200);
+requests=[];await mailer.group(managed,['a@example.com'],'Final','Listo','selected-key');assert.match(requests[0].body[0].text,/Horario seleccionado:/);assert.match(requests[0].body[0].text,/09:00/);assert.match(requests[0].body[0].text,/America\/Santiago/);
+console.log('PASS: account management owner isolation, date matching, final selection, close, stale preview and selected schedule email');

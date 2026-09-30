@@ -1,11 +1,12 @@
+import {validMeetingSelection} from './selected-meeting';
 import {z} from 'zod';
 import {hash,type CreatorMailer} from './api';
-import type {Poll} from './domain';
+import {meetingFits,type Poll} from './domain';
 import type {Store} from './store';
 export type GroupMailer=(poll:Poll,emails:string[],subject:string,message:string,key:string)=>Promise<void>;
 const tokenShape=z.string().regex(/^[a-f0-9]{64}$/);
 const reply=(body:unknown,status=200)=>Response.json(body,{status,headers:{'Cache-Control':'no-store','X-Content-Type-Options':'nosniff'}});
-export async function manage(request:Request,store:Store,id:string,mailAccess?:CreatorMailer,mailGroup?:GroupMailer){
+export async function manage(request:Request,store:Store,id:string,mailAccess?:CreatorMailer,mailGroup?:GroupMailer,account?:{id:string;role:'admin'|'manager'}){
  try{
   if(request.method!=='POST')return reply({error:'Operación no disponible.'},405);
   if(request.headers.get('origin')!==new URL(request.url).origin)return reply({error:'Origen no permitido.'},403);
@@ -19,20 +20,32 @@ export async function manage(request:Request,store:Store,id:string,mailAccess?:C
    if(!await store.creatorAccess(id,await hash(token)))return reply({error:'Ya se solicitó un enlace recientemente. Revisa el correo del creador o espera cinco minutos.'},429);
    await mailAccess(poll,token);return reply({message:'Enviamos un nuevo enlace privado al correo del creador. Los enlaces privados anteriores dejan de funcionar.'});
   }
-  const token=tokenShape.parse(body.token);if(!poll||!poll.manageHash||await hash(token)!==poll.manageHash)return reply({error:'El enlace privado no es válido. Solicita uno nuevo desde la consulta.'},403);
+  if(account){if(!poll||(account.role!=='admin'&&poll.ownerId!==account.id))return reply({error:'Esta consulta no está disponible para tu cuenta.'},403);}
+  else{const token=tokenShape.parse(body.token);if(!poll||!poll.manageHash||await hash(token)!==poll.manageHash)return reply({error:'El enlace privado no es válido. Solicita uno nuevo desde la consulta.'},403);}
+  if(!poll)return reply({error:'Consulta no disponible.'},404);
+  if(body.action==='finalize'){
+   if(!account)return reply({error:'Inicia sesión con la cuenta creadora.'},403);
+   const slot=z.string().max(80).parse(body.selectedSlot);
+   const selectedDate=z.string().max(10).optional().parse(body.selectedDate);
+   if(!validMeetingSelection(poll,slot,selectedDate))return reply({error:'El horario debe estar propuesto y cubrir la duración completa.'},400);
+   const updated=await store.accountManage?.(account.id,id,'finalize',undefined,slot,selectedDate);
+   if(!updated)return reply({error:'No se pudo confirmar el horario.'},409);
+   const {manageHash,...safe}=updated;return reply({poll:safe});
+  }
   if(body.action==='view'){const {manageHash,...safe}=poll;return reply({poll:safe,votes:await store.getVotes(id)});}
   if(body.action==='close'||body.action==='notifications'){
    const value=body.action==='notifications'?z.boolean().parse(body.notify):undefined;
-   const updated=await store.managePoll?.(id,poll.manageHash,body.action,value);if(!updated)return reply({error:'No se pudo actualizar la consulta.'},409);
+   const updated=account?await store.accountManage?.(account.id,id,body.action,value):await store.managePoll?.(id,poll.manageHash!,body.action,value);if(!updated)return reply({error:'No se pudo actualizar la consulta.'},409);
    const {manageHash,...safe}=updated;return reply({poll:safe});
   }
   if(body.action==='send'){
+   if(account&&(body.selectedSlot!==poll.selectedSlot||body.selectedDate!==poll.selectedDate))return reply({error:'El horario confirmado cambió. Actualiza la página y revisa el mensaje antes de enviarlo.'},409);
    if(!poll.closed)return reply({error:'Cierra los registros antes de notificar al grupo.'},409);
    if(!mailGroup)return reply({error:'El envío de correo no está disponible.'},503);
    const input=z.object({subject:z.string().trim().min(1).max(180).regex(/^[^\r\n]+$/),message:z.string().trim().min(1).max(5000),requestId:z.string().uuid()}).parse(body);
    const votes=await store.getVotes(id);const emails=[...new Set(votes.map(v=>v.email?.trim().toLowerCase()).filter((email):email is string=>!!email&&z.string().email().safeParse(email).success))].sort();
    if(!emails.length)return reply({error:'No hay participantes con correo registrado.'},400);
-   await mailGroup(poll,emails,input.subject,input.message,await hash(id+input.requestId+input.subject+input.message));
+   await mailGroup(poll,emails,input.subject,input.message,await hash(id+input.requestId+input.subject+input.message+(poll.selectedSlot||'')+(poll.selectedDate||'')));
    return reply({sent:emails.length});
   }
   return reply({error:'Operación no disponible.'},400);

@@ -20,7 +20,7 @@ console.log('PASS: notification after valid save, changes only, failed delivery 
 
 let inviteCalls=[];
 const invitationMailer=managementMailer({apiKey:'secret',from:'at meet <atmeet@contact.agencements.net>',siteUrl:'https://atmeet.netlify.app'},async(url,options)=>{inviteCalls.push({url,...options});return inviteCalls.length===1?new Response(null,{status:503}):Response.json({id:'invitation'});});
-await invitationMailer.invitation('invited@example.com','https://atmeet.netlify.app/admin#invite=private-token','admin-invite/test');
+await invitationMailer.admin('invite','invited@example.com','https://atmeet.netlify.app/admin#invite=private-token','admin-invite/test');
 assert.equal(inviteCalls.length,2);assert.equal(inviteCalls[0].body,inviteCalls[1].body);assert.equal(inviteCalls[0].headers['Idempotency-Key'],inviteCalls[1].headers['Idempotency-Key']);
 const invitationPayload=JSON.parse(inviteCalls[0].body);assert.deepEqual(invitationPayload.to,['invited@example.com']);assert.equal(invitationPayload.from,'at meet <atmeet@contact.agencements.net>');assert.match(invitationPayload.text,/7 días/);assert.match(invitationPayload.text,/https:\/\/atmeet.netlify.app\/admin#invite=/);
 console.log('PASS: invitation recipient, sender, private link, expiry and idempotent retry');

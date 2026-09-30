@@ -22,11 +22,11 @@ const fetcher=async(url,options={})=>{
    if(options.method==='POST'){invitations.set(b.token_hash,{...b,used:false});return new Response(null,{status:201});}
    const inv=invitations.get(h);return ok(inv&&!inv.used?[inv]:[]);
  }
- if(p==='/rest/v1/rpc/meeting_claim_invitation'){
-   const inv=invitations.get(b.p_hash);if(!inv||inv.used)return ok([]);inv.used=true;return ok([{email:inv.email}]);
+ if(p==='/rest/v1/rpc/meeting_claim_account_invitation'){
+   const inv=invitations.get(b.p_hash);if(!inv||inv.used)return ok([]);inv.used=true;return ok([{email:inv.email,role:inv.role}]);
  }
  if(p==='/rest/v1/rpc/meeting_delete_poll'){if(deleted.includes(b.p_id))return ok(false);deleted.push(b.p_id);return ok(true);}
- if(p==='/rest/v1/rpc/meeting_history'){historyCalls++;return ok({polls:[],total:0});}
+ if(p==='/rest/v1/rpc/meeting_account_history'){historyCalls++;return ok({polls:[],total:0});}
  throw Error('Unexpected fetch '+p);
 };
 const mail=[];
@@ -46,7 +46,7 @@ privileged=false;assert.equal((await handle(request('delete-poll',{id:'p_'+'a'.r
 assert.equal((await handle(request('delete-poll',{id:'invalid'},cookie))).status,400);assert.equal(deleted.length,0);
 assert.equal((await handle(request('delete-poll',{id:'p_'+'a'.repeat(32)},cookie))).status,200);
 assert.equal((await handle(request('delete-poll',{id:'p_'+'a'.repeat(32)},cookie))).status,404);assert.deepEqual(deleted,['p_'+'a'.repeat(32)]);
-const inv=await handle(request('invitations',{email:'invite@example.com'},cookie));assert.equal(inv.status,201);const {url,emailSent}=await inv.json();assert.equal(emailSent,true);assert.equal(mail.length,1);assert.equal(mail[0][0],'invite@example.com');assert.equal(mail[0][1],url);assert.match(mail[0][2],/^admin-invite\/[a-f0-9]{64}$/);const token=new URLSearchParams(new URL(url).hash.slice(1)).get('invite');
+const inv=await handle(request('invitations',{email:'invite@example.com'},cookie));assert.equal(inv.status,201);const {url,emailSent}=await inv.json();assert.equal(emailSent,true);assert.equal(mail.length,1);assert.equal(mail[0][0],'invite');assert.equal(mail[0][1],'invite@example.com');assert.equal(mail[0][2],url);assert.match(mail[0][3],/^admin-invite\/[a-f0-9]{64}$/);const token=new URLSearchParams(new URL(url).hash.slice(1)).get('invite');
 assert.equal((await handle(request('accept',{token,email:'wrong@example.com',password:'long-password-123'}))).status,400);
 const acceptance={token,email:'invite@example.com',password:'long-password-123'};
 const accepted=await Promise.all([handle(request('accept',acceptance)),handle(request('accept',acceptance))]);

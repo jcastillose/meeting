@@ -1,0 +1,14 @@
+'use client';
+import {useMemo,useState,useEffect} from 'react';
+import {Button} from '@/components/ui/button';
+import {days,times,meetingFits,dayLabel,clock,rank,validKeys,type Poll,type Vote} from '@/lib/domain';
+import {validMeetingSelection,selectedMeetingLabel} from '@/lib/selected-meeting';
+export function MeetingSelection({poll,votes,busy,onConfirm}:{poll:Poll;votes:Vote[];busy:boolean;onConfirm:(slot:string,date?:string)=>void}){
+ const keys=useMemo(()=>validKeys(poll),[poll]);
+ const choices=useMemo(()=>[...keys].filter(k=>meetingFits(poll,k,keys)),[keys,poll]);
+ const best=useMemo(()=>rank(poll,votes).slice(0,4),[poll,votes]);
+ const [slot,setSlot]=useState(poll.selectedSlot||best[0]?.key||choices[0]||''),[selectedDate,setSelectedDate]=useState(poll.selectedDate||''),[review,setReview]=useState(false);
+ useEffect(()=>{if(poll.selectedSlot){setSlot(poll.selectedSlot);setSelectedDate(poll.selectedDate||'');}},[poll.selectedSlot,poll.selectedDate]);
+ const day=slot.split('@')[0],valid=validMeetingSelection(poll,slot,selectedDate);
+ return <section style={{marginTop:24}}><h2>Horario definitivo</h2>{poll.selectedSlot&&<p className="hint">Confirmado: {selectedMeetingLabel(poll)}</p>}<fieldset disabled={busy||review} className="creation-fields"><label className="field">Día propuesto<select value={day} onChange={e=>{setSlot(choices.find(k=>k.startsWith(e.target.value+'@'))||'');setSelectedDate('');}}>{days(poll).filter(d=>choices.some(k=>k.startsWith(d+'@'))).map(d=><option key={d} value={d}>{dayLabel(poll,d)}</option>)}</select></label><label className="field">Hora de inicio<select value={slot} onChange={e=>setSlot(e.target.value)}>{choices.filter(k=>k.startsWith(day+'@')).map(k=><option key={k} value={k}>{clock(Number(k.split('@')[1]))} · {poll.duration||poll.step} minutos</option>)}</select></label>{poll.mode!=='dates'&&<label className="field">Fecha concreta del encuentro<input type="date" required value={selectedDate} onChange={e=>setSelectedDate(e.target.value)}/><span className="small muted">Debe coincidir con el día propuesto seleccionado.</span></label>}{best.length>0&&<p className="small muted">Mejor coincidencia: {dayLabel(poll,best[0].key.split('@')[0])}, {clock(Number(best[0].key.split('@')[1]))} · {best[0].yes} disponibles.</p>}</fieldset>{!review?<Button disabled={busy||!valid} onClick={()=>setReview(true)}>Revisar horario y cierre</Button>:<div className="send-review"><p><strong>{selectedMeetingLabel({...poll,selectedSlot:slot,selectedDate})}</strong></p><p>Se cerrarán los registros y se conservarán las respuestas. Después podrás revisar y enviar el aviso al grupo.</p><Button disabled={busy} onClick={()=>{onConfirm(slot,selectedDate||undefined);setReview(false);}}>Confirmar horario y cerrar registros</Button><Button variant="outline" disabled={busy} onClick={()=>setReview(false)}>Volver</Button></div>}</section>;
+}
