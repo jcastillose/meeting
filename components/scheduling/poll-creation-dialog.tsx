@@ -67,10 +67,15 @@ export function PollCreationDialog({
   notificationEmail,
   accountEmail,
 }: PollCreationDialogProps) {
-  const invalidSchedule =
-    !!form.dailyRanges &&
-    scheduleErrors(form.dailyRanges, form.step, form.duration || form.step)
-      .length > 0;
+  const duration = form.duration || form.step;
+  const proposedRanges = form.dailyRanges || [
+    { date: form.start, from: form.from, to: form.to },
+  ];
+  const scheduleIssues = scheduleErrors(proposedRanges, form.step, duration);
+  const invalidSchedule = scheduleIssues.length > 0;
+  const hourAligned = proposedRanges.every(
+    (range) => range.from % 60 === 0 && range.to % 60 === 0,
+  );
   return (
     <Dialog
       open={open}
@@ -89,7 +94,7 @@ export function PollCreationDialog({
           className="dialogform"
           onSubmit={(e) => {
             e.preventDefault();
-            void onSubmit();
+            if (!invalidSchedule) void onSubmit();
           }}
         >
           <fieldset disabled={busy} className="creation-fields">
@@ -258,10 +263,10 @@ export function PollCreationDialog({
                       label="Hora inicial"
                       value={String(form.from)}
                       onChange={(v) => setForm({ ...form, from: Number(v) })}
-                      options={Array.from({ length: 24 }, (_, i) => [
-                        String(i * 60),
-                        clock(i * 60),
-                      ])}
+                      options={Array.from(
+                        { length: Math.floor(form.to / form.step) },
+                        (_, i) => [String(i * form.step), clock(i * form.step)],
+                      )}
                     />
                   </div>
                   <div className="field">
@@ -270,10 +275,13 @@ export function PollCreationDialog({
                       label="Hora final"
                       value={String(form.to)}
                       onChange={(v) => setForm({ ...form, to: Number(v) })}
-                      options={Array.from({ length: 24 }, (_, i) => [
-                        String((i + 1) * 60),
-                        clock((i + 1) * 60),
-                      ])}
+                      options={Array.from(
+                        { length: Math.floor((1440 - form.from) / form.step) },
+                        (_, i) => {
+                          const minute = form.from + (i + 1) * form.step;
+                          return [String(minute), clock(minute)];
+                        },
+                      )}
                     />
                   </div>
                 </>
@@ -292,10 +300,11 @@ export function PollCreationDialog({
                         Number(v),
                     })
                   }
-                  options={[
-                    ["30", "30 minutos"],
-                    ["60", "60 minutos"],
-                  ]}
+                  options={
+                    hourAligned
+                      ? [["30", "30 minutos"], ["60", "60 minutos"]]
+                      : [["30", "30 minutos"]]
+                  }
                 />
               </div>
             </div>
@@ -304,8 +313,8 @@ export function PollCreationDialog({
               <input
                 type="number"
                 required
-                min={form.step}
-                step={form.step}
+                min={30}
+                step={30}
                 max={
                   form.dailyRanges
                     ? 1440
@@ -313,12 +322,18 @@ export function PollCreationDialog({
                 }
                 value={form.duration || form.step}
                 onChange={(e) =>
-                  setForm({ ...form, duration: Number(e.target.value) })
+                  setForm({
+                    ...form,
+                    duration: Number(e.target.value),
+                    step: Number(e.target.value) % 60 === 30 ? 30 : form.step,
+                  })
                 }
               />
             </label>
             <p className="small muted">
+              Puedes proponer reuniones desde 30 minutos, en incrementos de 30.
               Las coincidencias deben cubrir la duración completa de la reunión.
+              {!hourAligned && " Los horarios de media hora requieren bloques de 30 minutos."}
               {form.dailyRanges &&
                 " Cada día debe ofrecer al menos esa duración y sus horas deben coincidir con el tamaño de bloque."}
             </p>
@@ -334,6 +349,9 @@ export function PollCreationDialog({
               Quien tenga el enlace podrá ver nombres, comentarios y
               preferencias. No se requiere cuenta.
             </p>
+            {!form.dailyRanges && invalidSchedule && (
+              <p className="error" role="alert">{scheduleIssues.join(" ")}</p>
+            )}
             {dirty && (
               <p className="small muted">
                 Al crear una nueva consulta se descartarán los cambios sin

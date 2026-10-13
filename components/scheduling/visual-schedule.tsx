@@ -34,16 +34,15 @@ export function VisualSchedule({
     [first],
   );
   const valid = ranges.every((r) => usableRange(r, step));
-  const [bounds] = useState(() => ({
-    from: Math.min(
-      480,
-      ...ranges.filter((r) => usableRange(r, step)).map((r) => r.from),
-    ),
-    to: Math.max(
-      1200,
-      ...ranges.filter((r) => usableRange(r, step)).map((r) => r.to),
-    ),
-  }));
+  const bounds = useMemo(() => {
+    const usable = ranges.filter((range) => usableRange(range, step));
+    return usable.length
+      ? {
+          from: Math.min(...usable.map((range) => range.from)),
+          to: Math.max(...usable.map((range) => range.to)),
+        }
+      : { from: 540, to: 1080 };
+  }, [ranges, step]);
   const from = fullDay ? 0 : bounds.from,
     to = fullDay ? 1440 : bounds.to;
   const minutes = Array.from(
@@ -143,7 +142,7 @@ export function VisualSchedule({
             setActive(0);
           }}
         >
-          {fullDay ? "Ver horario diurno" : "Ver las 24 horas"}
+          {fullDay ? "Ver horario propuesto" : "Ver las 24 horas"}
         </Button>
       </div>
       <p id={id + "-help"} className="schedule-help">

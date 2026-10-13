@@ -148,3 +148,10 @@ body {
 
 
 .unavailable-slot{background:repeating-linear-gradient(135deg,#f1f2f1,#f1f2f1 5px,#e9ecea 5px,#e9ecea 6px)}.unavailable-slot:hover{box-shadow:none;background:#ecefec}
+
+/* Every proposed period stays visible; short date groups fit the available width. */
+.calendar-range-note{padding:0 20px 14px;font-size:14px;color:#686a6d}
+.calendar-period-title{padding:16px 20px;text-transform:capitalize;border-top:1px solid #e5e5e6}
+.calendar-period .dayhead strong{font-size:16px}
+.calendar-period .time{padding:5px 2px;line-height:1.35}
+.calendar-period .time span{font-size:10px;color:#8a8d90}
