@@ -146,9 +146,11 @@ export function VisualSchedule({
         </Button>
       </div>
       <p id={id + "-help"} className="schedule-help">
-        Selecciona bloques con clic o toque. Repite para desmarcar. Con teclado:
-        usa las flechas para moverte y Espacio o Enter para seleccionar. ✓
-        indica un bloque propuesto.
+        {step === 30
+          ? "Cada bloque de una hora se divide en dos mitades de 30 minutos. Selecciona cada mitad con clic o toque."
+          : "Selecciona bloques de una hora con clic o toque."}{" "}
+        Repite para desmarcar. Con teclado: usa las flechas para moverte y Espacio
+        o Enter para seleccionar. ✓ indica una opción propuesta.
       </p>
       {!valid && (
         <p className="schedule-error" role="alert">
@@ -179,40 +181,60 @@ export function VisualSchedule({
             </tr>
           </thead>
           <tbody>
-            {minutes.map((time, row) => (
-              <tr key={time}>
-                <th scope="row">{clock(time)}</th>
-                {days.map((day, col) => {
-                  const index = row * 7 + col,
-                    marked = selected.has(day + "@" + time);
-                  return (
-                    <td role="gridcell" key={day} aria-selected={marked}>
-                      <button
-                        ref={(el) => {
-                          buttons.current[index] = el;
-                        }}
-                        type="button"
-                        disabled={disabled || !valid}
-                        tabIndex={
-                          index === Math.min(active, minutes.length * 7 - 1)
-                            ? 0
-                            : -1
-                        }
-                        aria-pressed={marked}
-                        aria-label={`${date(day).toLocaleDateString("es-CL", { weekday: "long", day: "numeric", month: "long" })}, ${clock(time)}–${clock(time + step)}: ${marked ? "propuesto" : "sin seleccionar"}`}
-                        onFocus={() => setActive(index)}
-                        onKeyDown={(e) => {
-                          if (move(index, e.key)) e.preventDefault();
-                        }}
-                        onClick={() => toggle(day, time)}
-                      >
-                        {marked ? "✓" : <span aria-hidden="true">·</span>}
-                      </button>
-                    </td>
-                  );
-                })}
-              </tr>
-            ))}
+            {minutes.map((time, row) => {
+              const hour = Math.floor(time / 60) * 60;
+              const firstInHour =
+                row === 0 || Math.floor(minutes[row - 1] / 60) * 60 !== hour;
+              const continuesHour =
+                row + 1 < minutes.length &&
+                Math.floor(minutes[row + 1] / 60) * 60 === hour;
+              return (
+                <tr
+                  key={time}
+                  className={
+                    step === 30
+                      ? `schedule-half-hour ${continuesHour ? "schedule-hour-first-half" : "schedule-hour-end"}`
+                      : "schedule-hour-end"
+                  }
+                >
+                  {firstInHour && (
+                    <th scope="row" rowSpan={continuesHour ? 2 : 1}>
+                      {clock(hour)}
+                    </th>
+                  )}
+                  {days.map((day, col) => {
+                    const index = row * 7 + col,
+                      marked = selected.has(day + "@" + time);
+                    return (
+                      <td role="gridcell" key={day} aria-selected={marked}>
+                        <button
+                          ref={(el) => {
+                            buttons.current[index] = el;
+                          }}
+                          type="button"
+                          disabled={disabled || !valid}
+                          tabIndex={
+                            index === Math.min(active, minutes.length * 7 - 1)
+                              ? 0
+                              : -1
+                          }
+                          aria-pressed={marked}
+                          title={`${clock(time)}–${clock(time + step)}`}
+                          aria-label={`${date(day).toLocaleDateString("es-CL", { weekday: "long", day: "numeric", month: "long" })}, ${clock(time)}–${clock(time + step)}: ${marked ? "propuesto" : "sin seleccionar"}`}
+                          onFocus={() => setActive(index)}
+                          onKeyDown={(e) => {
+                            if (move(index, e.key)) e.preventDefault();
+                          }}
+                          onClick={() => toggle(day, time)}
+                        >
+                          {marked ? "✓" : <span aria-hidden="true">·</span>}
+                        </button>
+                      </td>
+                    );
+                  })}
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>

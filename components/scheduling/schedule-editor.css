@@ -197,3 +197,20 @@
   padding: 0;
   margin: 0;
 }
+
+/* One visual hour contains two independently selectable half-hour options. */
+.schedule-grid tbody th {
+  border-bottom: 1px solid #bdcec3;
+  vertical-align: top;
+  padding-top: 8px;
+}
+.schedule-grid .schedule-hour-end td {
+  border-bottom-color: #bdcec3;
+}
+.schedule-grid .schedule-half-hour td button {
+  height: 28px;
+  font-size: 16px;
+}
+.schedule-grid .schedule-hour-first-half td {
+  border-bottom: 1px dashed #bdcec3;
+}

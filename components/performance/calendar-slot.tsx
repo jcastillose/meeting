@@ -19,6 +19,7 @@ type Brush = Status | "erase";
 type Props = {
   slotKey: string;
   compact: boolean;
+  half?: boolean;
   poll: Poll;
   votes: Vote[];
   mine?: Status;
@@ -38,6 +39,7 @@ type Props = {
 export const CalendarSlot = memo(function CalendarSlot({
   slotKey: key,
   compact,
+  half=false,
   poll,
   votes,
   mine,
@@ -76,7 +78,7 @@ export const CalendarSlot = memo(function CalendarSlot({
         <button
           type="button"
           className={
-            "slot heat-slot " +
+            "slot heat-slot " + (half ? "half-hour-slot " : "") +
             cls +
             (s.yes + s.maybe + s.no > 0 ? " with-context" : "")
           }
@@ -113,6 +115,7 @@ export const CalendarSlot = memo(function CalendarSlot({
             paint(key, brush, true);
           }}
         >
+          {half&&<span className="half-hour-label" aria-hidden="true">{clock(Number(key.split("@")[1]))}–{clock(Number(key.split("@")[1])+poll.step)}</span>}
           <span
             className={
               "slot-personal" +

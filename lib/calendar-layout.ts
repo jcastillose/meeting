@@ -23,3 +23,8 @@ export function calendarMonths(p:Poll):(string|null)[][]{
   return cells;
  });
 }
+
+/** Visual hour groups keep the underlying 30/60-minute response keys intact. */
+export function calendarHours(p:Poll,columns:string[]):number[]{
+ return [...new Set(calendarTimes(p,columns).map(t=>Math.floor(t/60)*60))].sort((a,b)=>a-b);
+}
