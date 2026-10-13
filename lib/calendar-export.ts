@@ -26,9 +26,9 @@ export function calendarEvent(poll:Poll,key:string,link:string,now=new Date()):s
   const [day,minute]=key.split('@');
   const start=zonedInstant(day,+minute,poll.timezone),end=zonedInstant(day,+minute+(poll.duration||poll.step),poll.timezone);
   if(end<=start)throw Error('El bloque coincide con un cambio de hora. Elige otro horario.');
-  return ['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//at meet//Horarios compartidos//ES','CALSCALE:GREGORIAN','BEGIN:VEVENT',
+  return ['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//AtMeet//Horarios compartidos//ES','CALSCALE:GREGORIAN','BEGIN:VEVENT',
     `UID:${poll.id}-${day}-${minute}@atmeet.netlify.app`,`DTSTAMP:${stamp(now)}`,`DTSTART:${stamp(start)}`,`DTEND:${stamp(end)}`,
-    `SUMMARY:${text(poll.title)}`,`DESCRIPTION:${text('Horario propuesto en at meet. Zona horaria: '+poll.timezone+'\nConsulta: '+link)}`,
+    `SUMMARY:${text(poll.title)}`,`DESCRIPTION:${text('Horario propuesto en AtMeet. Zona horaria: '+poll.timezone+'\nConsulta: '+link)}`,
     'STATUS:TENTATIVE','END:VEVENT','END:VCALENDAR'].map(fold).join('\r\n')+'\r\n';
 }
 

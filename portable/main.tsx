@@ -30,7 +30,7 @@ createRoot(document.getElementById("root")!).render(
     <Suspense
       fallback={
         <main className="shell" role="status">
-          Cargando at meet…
+          Cargando AtMeet…
         </main>
       }
     >
