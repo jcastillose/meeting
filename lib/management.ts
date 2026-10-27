@@ -25,6 +25,7 @@ export async function manage(request:Request,store:Store,id:string,mailAccess?:C
   if(!poll)return reply({error:'Consulta no disponible.'},404);
   if(body.action==='finalize'){
    if(!account)return reply({error:'Inicia sesión con la cuenta creadora.'},403);
+   if(poll.closureOutcome==='no_agreement')return reply({error:'Reabre los registros antes de confirmar un horario para esta consulta.'},409);
    const slot=z.string().max(80).parse(body.selectedSlot);
    const selectedDate=z.string().max(10).optional().parse(body.selectedDate);
    if(!validMeetingSelection(poll,slot,selectedDate))return reply({error:'El horario debe estar propuesto y cubrir la duración completa.'},400);
@@ -39,15 +40,17 @@ export async function manage(request:Request,store:Store,id:string,mailAccess?:C
    if(!updated)return reply({error:'No se pudo reabrir la consulta. Actualiza la página y revisa tu acceso.'},409);
    const {manageHash,...safe}=updated;return reply({poll:safe});
   }
-  if(body.action==='close'||body.action==='notifications'){
+  if(body.action==='close'||body.action==='close_no_agreement'||body.action==='notifications'){
+   if(body.action==='close_no_agreement'&&poll.selectedSlot)return reply({error:'Esta consulta ya tiene un horario confirmado. Reabre los registros antes de cerrarla sin acuerdo.'},409);
    const value=body.action==='notifications'?z.boolean().parse(body.notify):undefined;
    const updated=account?await store.accountManage?.(account.id,id,body.action,value):await store.managePoll?.(id,poll.manageHash!,body.action,value);if(!updated)return reply({error:'No se pudo actualizar la consulta.'},409);
    const {manageHash,...safe}=updated;return reply({poll:safe});
   }
   if(body.action==='send'){
-   if((body.selectedSlot!==poll.selectedSlot||body.selectedDate!==poll.selectedDate))return reply({error:'El horario confirmado cambió. Actualiza la página y revisa el mensaje antes de enviarlo.'},409);
+   if((body.selectedSlot!==poll.selectedSlot||body.selectedDate!==poll.selectedDate||body.closureOutcome!==poll.closureOutcome))return reply({error:'El resultado de la consulta cambió. Actualiza la página y revisa el mensaje antes de enviarlo.'},409);
    if(!poll.closed)return reply({error:'Cierra los registros antes de notificar al grupo.'},409);
-   const notificationKind=z.enum(['confirmation','information']).optional().parse(body.notificationKind)||(poll.selectedSlot?'confirmation':'information');
+   const notificationKind=z.enum(['confirmation','information','no-agreement']).optional().parse(body.notificationKind)||(poll.closureOutcome==='no_agreement'?'no-agreement':poll.selectedSlot?'confirmation':'information');
+   if(poll.closureOutcome==='no_agreement'&&notificationKind!=='no-agreement'||poll.closureOutcome!=='no_agreement'&&notificationKind==='no-agreement')return reply({error:'El tipo de aviso no corresponde al resultado de esta consulta.'},409);
    if(notificationKind==='confirmation'&&(!poll.selectedSlot||!validMeetingSelection(poll,poll.selectedSlot,poll.selectedDate)))return reply({error:'Selecciona y confirma el horario definitivo antes de enviar una confirmación con enlaces de calendario.'},409);
    if(!mailGroup)return reply({error:'El envío de correo no está disponible.'},503);
    const input=z.object({subject:z.string().trim().min(1).max(180).regex(/^[^\r\n]+$/),message:z.string().trim().min(1).max(5000),requestId:z.string().uuid()}).parse(body);

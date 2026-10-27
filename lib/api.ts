@@ -8,7 +8,7 @@ const voteInput=z.object({email:z.string().trim().email().max(254).transform(v=>
 const headers={'Cache-Control':'no-store','X-Content-Type-Options':'nosniff'};
 const json=(d:unknown,status=200)=>Response.json(d,{status,headers});
 // Creator contact details are only returned through the authenticated admin history.
-function publicPoll(p:Poll):Poll{const {id,title,mode,start,end,from,to,step,duration,dailyRanges,timezone,created,closed,closedAt}=p;return {id,title,mode,start,end,from,to,step,duration,dailyRanges,timezone,created,closed,closedAt};}
+function publicPoll(p:Poll):Poll{const {id,title,mode,start,end,from,to,step,duration,dailyRanges,timezone,created,closed,closedAt,closureOutcome}=p;return {id,title,mode,start,end,from,to,step,duration,dailyRanges,timezone,created,closed,closedAt,closureOutcome};}
 export async function hash(s:string){return Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(s))),b=>b.toString(16).padStart(2,'0')).join('');}
 export function publicVote(v:Vote):Vote{const {id,name,comment,slots}=v;return {id,name,comment,slots};}
 export const managementPath=(id:string,token:string)=>`/manage?p=${id}#${token}`;

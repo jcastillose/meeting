@@ -8,11 +8,16 @@ begin
  if old is null or (r<>'admin' and coalesce(old->>'ownerId','')<>p_user::text) then return null;end if;
  updated:=old;
  if p_action='close' then updated:=old||jsonb_build_object('closed',true,'closedAt',coalesce(old->>'closedAt',now()::text));
+ elsif p_action='close_no_agreement' then
+  if old->>'selectedSlot' is not null then return null;end if;
+  updated:=(old-'selectedSlot'-'selectedDate')||jsonb_build_object('closed',true,'closedAt',coalesce(old->>'closedAt',now()::text),'closureOutcome','no_agreement');
  elsif p_action='reopen' then
   if not coalesce((old->>'closed')::boolean,false) then return old;end if;
-  updated:=(old-'closedAt'-'selectedSlot'-'selectedDate')||jsonb_build_object('closed',false,'reopenedAt',now(),'updated',now(),'scheduleRevision',coalesce((old->>'scheduleRevision')::integer,0)+1);
+  updated:=(old-'closedAt'-'selectedSlot'-'selectedDate'-'closureOutcome')||jsonb_build_object('closed',false,'reopenedAt',now(),'updated',now(),'scheduleRevision',coalesce((old->>'scheduleRevision')::integer,0)+1);
  elsif p_action='notifications' then updated:=jsonb_set(old,'{creator,notify}',to_jsonb(p_notify));
- elsif p_action='finalize' and p_slot is not null then updated:=old||jsonb_build_object('closed',true,'closedAt',coalesce(old->>'closedAt',now()::text),'selectedSlot',p_slot,'selectedDate',p_date);
+ elsif p_action='finalize' and p_slot is not null then
+  if old->>'closureOutcome'='no_agreement' then return null;end if;
+  updated:=(old-'closureOutcome')||jsonb_build_object('closed',true,'closedAt',coalesce(old->>'closedAt',now()::text),'selectedSlot',p_slot,'selectedDate',p_date);
  else raise exception 'Invalid action';end if;
  update public.polls set data=updated::text where id=p_id;
  return updated;

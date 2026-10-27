@@ -172,3 +172,4 @@ body {
 .compact-hour h4{font-size:12px;padding:7px;text-align:center;background:#f3f4f4;border-bottom:1px solid #d6d8da}
 .compact-hour .hour-block{border-right:0;border-bottom:0}
 @media(max-width:600px){.hour-block>.slot{min-height:40px}.half-hour-label{font-size:10px}}
+.close-without-agreement{margin-top:12px}

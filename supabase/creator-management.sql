@@ -17,6 +17,9 @@ begin
  select data::jsonb into document from public.polls where id=p_id for update;
  if document is null or document->>'manageHash' is distinct from p_hash then return null; end if;
  if p_action='close' then document=document||jsonb_build_object('closed',true,'closedAt',coalesce(document->>'closedAt',to_char(now() at time zone 'utc','YYYY-MM-DD"T"HH24:MI:SS"Z"')));
+ elsif p_action='close_no_agreement' then
+  if document->>'selectedSlot' is not null then return null;end if;
+  document:=(document-'selectedSlot'-'selectedDate')||jsonb_build_object('closed',true,'closedAt',coalesce(document->>'closedAt',to_char(now() at time zone 'utc','YYYY-MM-DD"T"HH24:MI:SS"Z"')),'closureOutcome','no_agreement');
  elsif p_action='notifications' and p_notify is not null then document=jsonb_set(document,'{creator,notify}',to_jsonb(p_notify));
  else return null; end if;
  update public.polls set data=document::text where id=p_id;

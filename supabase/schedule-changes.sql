@@ -11,7 +11,7 @@ alter table public.meeting_schedule_changes enable row level security;
 revoke all on public.meeting_schedule_changes from public,anon,authenticated;
 grant select,insert,update,delete on public.meeting_schedule_changes to service_role;
 create index meeting_schedule_notice_pending on public.meeting_schedule_changes(created_at,id) where not notification_done;
-create function public.meeting_edit_schedule(p_user uuid,p_id text,p_revision integer,p_patch jsonb,p_keys text[],p_notify boolean,p_reopen boolean) returns jsonb
+create or replace function public.meeting_edit_schedule(p_user uuid,p_id text,p_revision integer,p_patch jsonb,p_keys text[],p_notify boolean,p_reopen boolean) returns jsonb
 language plpgsql security invoker set search_path='' as $$
 declare r text;old jsonb;updated jsonb;previous jsonb;recipients text[];
 begin
@@ -22,7 +22,7 @@ begin
  if coalesce((old->>'closed')::boolean,false) and not coalesce(p_reopen,false) then raise exception 'Reopen required';end if;
  if p_keys is null or cardinality(p_keys)<1 or cardinality(p_keys)>3000 or exists(select 1 from jsonb_object_keys(p_patch) k where k not in ('start','end','from','to','dailyRanges')) then raise exception 'Invalid patch';end if;
  select coalesce(jsonb_agg(data::jsonb),'[]'::jsonb),coalesce(array_agg(distinct lower(trim(data::jsonb->>'email'))) filter(where data::jsonb->>'email' ~ '^[^[:space:]@]+@[^[:space:]@]+\.[^[:space:]@]+$'),'{}'::text[]) into previous,recipients from public.votes where poll_id=p_id;
- updated:=(old-'selectedSlot'-'selectedDate'-'closedAt')||p_patch||jsonb_build_object('scheduleRevision',p_revision+1,'updated',now(),'closed',false);
+ updated:=(old-'selectedSlot'-'selectedDate'-'closedAt'-'closureOutcome')||p_patch||jsonb_build_object('scheduleRevision',p_revision+1,'updated',now(),'closed',false);
  update public.meeting_schedule_changes set notification_done=true where poll_id=p_id and not notification_done;
  insert into public.meeting_schedule_changes(poll_id,revision,changed_by,before_data,after_data,votes_before,emails,notification_done)
  values(p_id,p_revision+1,p_user,old-'manageHash',updated-'manageHash',previous,recipients,not coalesce(p_notify,true) or cardinality(recipients)=0);
