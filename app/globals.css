@@ -175,3 +175,5 @@ body {
 .compact-hour .hour-block{border-right:0;border-bottom:0}
 @media(max-width:600px){.hour-block>.slot{min-height:40px}.half-hour-label{font-size:10px}}
 .close-without-agreement{margin-top:12px}
+
+.admin-status-note{margin:0;padding:0 22px 16px;color:#686a6d;font-size:13px;line-height:1.5}.admin-entry-heading{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.admin-entry-heading h2{margin:0}.consultation-status{display:inline-flex;align-items:center;gap:7px;border:1px solid transparent;border-radius:999px;padding:4px 9px;font-size:12px;font-weight:650;line-height:1.2;white-space:nowrap}.consultation-status-dot{width:7px;height:7px;border-radius:50%;background:currentColor}.consultation-status-open{background:#e4f3ed;color:#23694e;border-color:#c8e6d7}.consultation-status-expired{background:#fff2dc;color:#885a13;border-color:#f3dfb6}.consultation-status-closed{background:#eceeef;color:#555c60;border-color:#d9dcde}
