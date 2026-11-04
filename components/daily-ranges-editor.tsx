@@ -30,13 +30,14 @@ export function DailyRangesEditor({
     <fieldset
       className="schedule-editor"
       disabled={disabled}
-      aria-describedby={id + "-description"}
+      aria-describedby={id + "-description " + id + "-validation"}
       aria-busy={disabled}
     >
       <legend>Días y horarios propuestos</legend>
       <p id={id + "-description"} className="schedule-help">
         Escribe tus tramos o márcalos en el calendario. Puedes proponer varios
-        horarios por fecha y dejar pausas entre ellos.
+        horarios por fecha y dejar pausas entre ellos. Cada tramo continuo debe
+        cubrir al menos {duration} minutos.
       </p>
       <Tabs defaultValue="written">
         <TabsList aria-label="Forma de editar horarios">
@@ -47,6 +48,7 @@ export function DailyRangesEditor({
           <WrittenRanges
             ranges={ranges}
             step={step}
+            duration={duration}
             onChange={onChange}
             disabled={disabled}
           />
@@ -55,12 +57,13 @@ export function DailyRangesEditor({
           <VisualSchedule
             ranges={ranges}
             step={step}
+            duration={duration}
             onChange={onChange}
             disabled={disabled}
           />
         </TabsContent>
       </Tabs>
-      <div aria-live="polite" className="schedule-validation">
+      <div id={id + "-validation"} aria-live="polite" className="schedule-validation">
         {errors.length ? (
           <ul>
             {errors.map((e) => (

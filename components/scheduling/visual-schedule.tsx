@@ -5,7 +5,8 @@ import { add, clock, date, today, type DailyRange } from "@/lib/domain";
 import {
   MAX_SCHEDULE_DAYS,
   MAX_SCHEDULE_RANGES,
-  toggleBlock,
+  proposalSelection,
+  toggleProposalWindow,
   usableRange,
   validDate,
 } from "@/lib/schedule";
@@ -13,11 +14,13 @@ export function VisualSchedule({
   ranges,
   onChange,
   step,
+  duration = step,
   disabled = false,
 }: {
   ranges: DailyRange[];
   onChange: (value: DailyRange[]) => void;
   step: number;
+  duration?: number;
   disabled?: boolean;
 }) {
   const id = useId();
@@ -33,7 +36,8 @@ export function VisualSchedule({
     () => Array.from({ length: 7 }, (_, i) => add(first, i)),
     [first],
   );
-  const valid = ranges.every((r) => usableRange(r, step));
+  const validDuration = Number.isInteger(duration) && duration >= step && duration <= 1440 && duration % step === 0;
+  const valid = validDuration && ranges.every((r) => usableRange(r, step));
   const bounds = useMemo(() => {
     const usable = ranges.filter((range) => usableRange(range, step));
     return usable.length
@@ -57,7 +61,9 @@ export function VisualSchedule({
     return keys;
   }, [ranges, step]);
   function toggle(day: string, time: number) {
-    const next = toggleBlock(ranges, day, time, step);
+    const window = proposalSelection(ranges, day, time, step, duration);
+    if (!window || !valid) return;
+    const next = toggleProposalWindow(ranges, day, time, step, duration);
     const dates = next.map((r) => r.date).sort();
     if (
       next.length > MAX_SCHEDULE_RANGES ||
@@ -72,7 +78,7 @@ export function VisualSchedule({
     }
     onChange(next);
     setMessage(
-      `${date(day).toLocaleDateString("es-CL", { day: "numeric", month: "long" })}, ${clock(time)}: ${selected.has(day + "@" + time) ? "bloque desmarcado" : "bloque añadido"}.`,
+      `${date(day).toLocaleDateString("es-CL", { day: "numeric", month: "long" })}, ${clock(window.from)}–${clock(window.to)}: ${selected.has(day + "@" + time) ? "tramo retirado" : "tramo añadido"}.`,
     );
   }
   function move(index: number, key: string) {
@@ -87,6 +93,7 @@ export function VisualSchedule({
     else if (key === "Home") next = row * 7;
     else if (key === "End") next = row * 7 + 6;
     else return false;
+    if (buttons.current[next]?.disabled) return true;
     setActive(next);
     buttons.current[next]?.focus();
     return true;
@@ -146,15 +153,17 @@ export function VisualSchedule({
         </Button>
       </div>
       <p id={id + "-help"} className="schedule-help">
-        {step === 30
-          ? "Cada bloque de una hora se divide en dos mitades de 30 minutos. Selecciona cada mitad con clic o toque."
-          : "Selecciona bloques de una hora con clic o toque."}{" "}
-        Repite para desmarcar. Con teclado: usa las flechas para moverte y Espacio
-        o Enter para seleccionar. ✓ indica una opción propuesta.
+        La rejilla muestra intervalos de {step} minutos. Cada clic o toque
+        propone o retira un tramo de {duration} minutos continuos. Al final de
+        un tramo propuesto, la retirada se ajusta hacia atrás para cubrir esa
+        duración. Con teclado: usa las flechas para moverte y Espacio o Enter
+        para seleccionar. ✓ indica un intervalo incluido en la propuesta.
+        Los fragmentos menores de {duration} minutos deben ampliarse o retirarse
+        antes de guardar.
       </p>
       {!valid && (
         <p className="schedule-error" role="alert">
-          Completa o corrige los campos escritos antes de usar el calendario.
+          Completa o corrige la duración y los campos escritos antes de usar el calendario.
         </p>
       )}
       <div className="schedule-grid-scroll">
@@ -204,7 +213,8 @@ export function VisualSchedule({
                   )}
                   {days.map((day, col) => {
                     const index = row * 7 + col,
-                      marked = selected.has(day + "@" + time);
+                      marked = selected.has(day + "@" + time),
+                      selection = proposalSelection(ranges, day, time, step, duration);
                     return (
                       <td role="gridcell" key={day} aria-selected={marked}>
                         <button
@@ -212,15 +222,15 @@ export function VisualSchedule({
                             buttons.current[index] = el;
                           }}
                           type="button"
-                          disabled={disabled || !valid}
+                          disabled={disabled || !valid || !selection}
                           tabIndex={
                             index === Math.min(active, minutes.length * 7 - 1)
                               ? 0
                               : -1
                           }
                           aria-pressed={marked}
-                          title={`${clock(time)}–${clock(time + step)}`}
-                          aria-label={`${date(day).toLocaleDateString("es-CL", { weekday: "long", day: "numeric", month: "long" })}, ${clock(time)}–${clock(time + step)}: ${marked ? "propuesto" : "sin seleccionar"}`}
+                          title={selection ? `${marked ? "Quitar" : "Proponer"} ${clock(selection.from)}–${clock(selection.to)}` : `No cabe una reunión de ${duration} minutos antes de las 24:00`}
+                          aria-label={`${date(day).toLocaleDateString("es-CL", { weekday: "long", day: "numeric", month: "long" })}, ${clock(time)}–${clock(time + step)}: ${marked ? "propuesto" : "sin seleccionar"}. ${selection ? `${marked ? "Quitar" : "Proponer"} ${clock(selection.from)}–${clock(selection.to)}` : `No cabe una reunión de ${duration} minutos antes de las 24:00`}`}
                           onFocus={() => setActive(index)}
                           onKeyDown={(e) => {
                             if (move(index, e.key)) e.preventDefault();

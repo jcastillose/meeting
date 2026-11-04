@@ -8,11 +8,13 @@ export function WrittenRanges({
   ranges,
   onChange,
   step,
+  duration = step,
   disabled = false,
 }: {
   ranges: DailyRange[];
   onChange: (value: DailyRange[]) => void;
   step: number;
+  duration?: number;
   disabled?: boolean;
 }) {
   // Stable row identity survives deletion without moving partially typed text to another row.
@@ -27,7 +29,8 @@ export function WrittenRanges({
     <div className="schedule-written">
       <p className="schedule-help">
         Escribe horas en formato 24 h (HH:MM). Puedes repetir una fecha para
-        añadir una pausa entre tramos.
+        añadir una pausa entre tramos. Cada tramo continuo debe durar al menos
+        {duration} minutos.
       </p>
       {!ranges.length && (
         <p className="schedule-empty">
@@ -84,13 +87,15 @@ export function WrittenRanges({
           disabled={disabled || ranges.length >= MAX_SCHEDULE_RANGES}
           onClick={() => {
             const last = ranges.at(-1);
+            const length = Number.isInteger(duration) && duration >= step && duration <= 1440 ? duration : step;
+            const from = Math.min(540, 1440 - length);
             onChange([
               ...ranges,
               {
                 date:
                   last && validDate(last.date) ? add(last.date, 1) : today(),
-                from: 540,
-                to: 1080,
+                from,
+                to: from + length,
               },
             ]);
           }}

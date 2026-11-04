@@ -108,3 +108,55 @@ export function toggleBlock(
     }),
   );
 }
+
+/** Window explicitly selected by a calendar action, never crossing a day boundary. */
+export function proposalSelection(
+  ranges: DailyRange[],
+  day: string,
+  minute: number,
+  step: number,
+  duration = step,
+): DailyRange | null {
+  if (
+    !validDate(day) ||
+    ![30, 60].includes(step) ||
+    !Number.isInteger(duration) || duration < step || duration > 1440 || duration % step !== 0 ||
+    !Number.isInteger(minute) || minute < 0 || minute >= 1440 || minute % step !== 0
+  ) return null;
+  const containing = canonicalRanges(ranges).find(
+    (range) => range.date === day && range.from <= minute && minute < range.to,
+  );
+  if (containing) {
+    // Allow a user to remove an invalid short draft explicitly, without deleting other ranges.
+    if (containing.to - containing.from < duration) return { ...containing };
+    const from = Math.max(containing.from, Math.min(minute, containing.to - duration));
+    return { date: day, from, to: from + duration };
+  }
+  return minute + duration <= 1440
+    ? { date: day, from: minute, to: minute + duration }
+    : null;
+}
+
+/** Add/remove one meeting window. Short remainders stay visible for validation and correction. */
+export function toggleProposalWindow(
+  ranges: DailyRange[],
+  day: string,
+  minute: number,
+  step: number,
+  duration = step,
+): DailyRange[] {
+  const window = proposalSelection(ranges, day, minute, step, duration);
+  if (!window) return ranges;
+  const selected = ranges.some(
+    (range) => range.date === day && range.from <= minute && minute < range.to,
+  );
+  if (!selected) return canonicalRanges([...ranges, window]);
+  return canonicalRanges(ranges.flatMap((range) => {
+    if (range.date !== day || range.to <= window.from || range.from >= window.to)
+      return [range];
+    return [
+      ...(range.from < window.from ? [{ ...range, to: window.from }] : []),
+      ...(range.to > window.to ? [{ ...range, from: window.to }] : []),
+    ];
+  }));
+}
