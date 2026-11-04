@@ -35,7 +35,7 @@ export function calendarEvent(poll:Poll,key:string,link:string,now=new Date()):s
 export function confirmedCalendar(poll:Poll,link:string,message=''){
  if(!poll.selectedSlot||!validMeetingSelection(poll,poll.selectedSlot,poll.selectedDate))throw Error('Confirma una fecha y un horario válidos antes de compartir el evento.');
  const [day,minute]=poll.selectedSlot.split('@'),concreteDay=poll.mode==='dates'?day:poll.selectedDate!;
- const concrete:Poll={...poll,mode:'dates',start:concreteDay,end:concreteDay,dailyRanges:poll.dailyRanges?.filter(r=>r.date===day).map(r=>({...r,date:concreteDay}))};
+ const concrete:Poll={...poll,...(poll.mode!=='dates'?{includeSaturdays:undefined,includeSundays:undefined}:{}),mode:'dates',start:concreteDay,end:concreteDay,dailyRanges:poll.dailyRanges?.filter(r=>r.date===day).map(r=>({...r,date:concreteDay}))};
  const start=zonedInstant(concreteDay,+minute,poll.timezone),end=zonedInstant(concreteDay,+minute+(poll.duration||poll.step),poll.timezone);
  if(end<=start)throw Error('El horario coincide con un cambio de hora.');
  const google=new URL('https://calendar.google.com/calendar/render');

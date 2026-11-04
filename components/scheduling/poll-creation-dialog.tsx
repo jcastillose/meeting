@@ -14,8 +14,8 @@ import {
   SelectContent,
   SelectItem,
 } from "@/components/ui/select";
-import { add, clock, modes, type Mode, type Poll } from "@/lib/domain";
-import { scheduleErrors } from "@/lib/schedule";
+import { add, clock, days, modes, type Mode, type Poll } from "@/lib/domain";
+import { scheduleErrors, validDate } from "@/lib/schedule";
 import { DailyRangesEditor } from "@/components/daily-ranges-editor";
 export type PollCreationDialogProps = {
   accountEmail?: string;
@@ -71,7 +71,15 @@ export function PollCreationDialog({
   const proposedRanges = form.dailyRanges || [
     { date: form.start, from: form.from, to: form.to },
   ];
-  const scheduleIssues = scheduleErrors(proposedRanges, form.step, duration);
+  const includedDateCount = form.mode === "dates" && !form.dailyRanges &&
+    validDate(form.start) && validDate(form.end) && form.end >= form.start
+    ? days(form).length : null;
+  const scheduleIssues = [
+    ...scheduleErrors(proposedRanges, form.step, duration),
+    ...(includedDateCount === 0
+      ? ["El rango no contiene fechas incluidas. Amplía las fechas o activa el sábado o domingo correspondiente."]
+      : []),
+  ];
   const invalidSchedule = scheduleIssues.length > 0;
   const hourAligned = proposedRanges.every(
     (range) => range.from % 60 === 0 && range.to % 60 === 0,
@@ -249,6 +257,7 @@ export function PollCreationDialog({
                 onChange={(dailyRanges) => setForm({ ...form, dailyRanges })}
               />
             ) : form.mode === "dates" ? (
+              <>
               <div className="row">
                 <label className="field">
                   Desde
@@ -273,6 +282,32 @@ export function PollCreationDialog({
                   />
                 </label>
               </div>
+              <fieldset className="creator-fields">
+                <legend>Días del rango</legend>
+                <p className="small muted">Se incluyen los días de lunes a viernes. Puedes añadir sábados y domingos por separado.</p>
+                <div className="row">
+                  <label className="notification-choice">
+                    <input
+                      type="checkbox"
+                      checked={form.includeSaturdays !== false}
+                      onChange={(e) => setForm({ ...form, includeSaturdays: e.target.checked })}
+                    />
+                    <span>Incluir sábados</span>
+                  </label>
+                  <label className="notification-choice">
+                    <input
+                      type="checkbox"
+                      checked={form.includeSundays !== false}
+                      onChange={(e) => setForm({ ...form, includeSundays: e.target.checked })}
+                    />
+                    <span>Incluir domingos</span>
+                  </label>
+                </div>
+                {includedDateCount !== null && <p className="small muted" role="status" aria-live="polite">
+                  {includedDateCount === 1 ? "Se incluirá 1 fecha del rango." : `Se incluirán ${includedDateCount} fechas del rango.`}
+                </p>}
+              </fieldset>
+              </>
             ) : (
               <p className="hint">
                 {form.mode === "week"

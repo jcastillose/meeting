@@ -1,7 +1,7 @@
 export type Mode = "dates"|"week"|"month";
 export type Status = "yes"|"maybe"|"no";
 export type DailyRange = {date:string;from:number;to:number};
-export type Poll = {selectedDate?:string;selectedSlot?:string;closureOutcome?:'no_agreement';ownerId?:string;scheduleRevision?:number;id:string; title:string; mode:Mode; start:string; end:string; from:number; to:number; step:number; duration?:number;dailyRanges?:DailyRange[]; timezone:string; created:string; closed?:boolean;closedAt?:string;manageHash?:string;creator?:{name:string;email:string;notify?:boolean}};
+export type Poll = {selectedDate?:string;selectedSlot?:string;closureOutcome?:'no_agreement';ownerId?:string;scheduleRevision?:number;id:string; title:string; mode:Mode; start:string; end:string; from:number; to:number; step:number; duration?:number;includeSaturdays?:boolean;includeSundays?:boolean;dailyRanges?:DailyRange[]; timezone:string; created:string; closed?:boolean;closedAt?:string;manageHash?:string;creator?:{name:string;email:string;notify?:boolean}};
 export type Vote = {id:string; name:string; email?:string; comment:string; slots:Record<string,Status>};
 export const weekdays=["Lunes","Martes","Miércoles","Jueves","Viernes","Sábado","Domingo"];
 export const modes={dates:"Fechas concretas",week:"Semana habitual",month:"Días habituales del mes"};
@@ -15,7 +15,7 @@ export function times(p:Poll,day?:string){
   return [...new Set(ranges.flatMap(r=>Array.from({length:Math.max(0,Math.floor((r.to-r.from)/p.step))},(_,i)=>r.from+i*p.step)))].sort((a,b)=>a-b);
 }
 export function clock(n:number){return `${String(Math.floor(n/60)).padStart(2,'0')}:${String(n%60).padStart(2,'0')}`;}
-export function days(p:Poll){if(p.dailyRanges)return [...new Set(p.dailyRanges.map(r=>r.date))].sort();if(p.mode==='week')return weekdays.map((_,i)=>`w${i}`);if(p.mode==='month')return Array.from({length:31},(_,i)=>`m${i+1}`);let out:string[]=[];for(let s=p.start;s<=p.end;s=add(s,1)){out.push(s);if(out.length>62)break;}return out;}
+export function days(p:Poll){if(p.dailyRanges)return [...new Set(p.dailyRanges.map(r=>r.date))].sort();if(p.mode==='week')return weekdays.map((_,i)=>`w${i}`);if(p.mode==='month')return Array.from({length:31},(_,i)=>`m${i+1}`);let out:string[]=[];for(let s=p.start,count=0;s<=p.end&&count<63;s=add(s,1),count++){const weekday=date(s).getDay();if(weekday===6&&p.includeSaturdays===false||weekday===0&&p.includeSundays===false)continue;out.push(s);}return out;}
 const dayFormatter=new Intl.DateTimeFormat("es-CL",{weekday:"short",day:"numeric",month:"short"});
 export function dayLabel(p:Poll,k:string){return p.mode==='week'?weekdays[Number(k.slice(1))]:p.mode==='month'?`Día ${k.slice(1)} de cada mes`:dayFormatter.format(date(k));}
 export function slotLabel(p:Poll,k:string,duration=p.step){const [d,t]=k.split('@');return `${dayLabel(p,d)}, ${clock(Number(t))}–${clock(Number(t)+duration)}`;}
