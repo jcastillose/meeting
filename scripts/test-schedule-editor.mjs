@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import {
   scheduleErrors,
   toggleBlock,
+  proposalSelection,
+  toggleProposalWindow,
   canonicalRanges,
   parseTime,
 } from "../lib/schedule.ts";
@@ -35,6 +37,33 @@ assert.deepEqual(
   ]),
   [a],
 );
+// A visual proposal uses the chosen meeting duration, while keeping 30-minute precision.
+const day = a.date;
+const ninety = { date: day, from: 540, to: 630 };
+assert.deepEqual(toggleProposalWindow([], day, 540, 30, 90), [ninety]);
+assert.deepEqual(toggleProposalWindow([ninety], day, 540, 30, 90), []);
+assert.deepEqual(proposalSelection([ninety], day, 600, 30, 90), ninety,
+  "Removing near the end stays inside the proposed range.");
+assert.deepEqual(toggleProposalWindow([ninety, b], day, 600, 30, 90), [b],
+  "Removing a meeting window never crosses a pause or changes another proposal.");
+assert.equal(proposalSelection([], day, 1410, 30, 90), null);
+assert.deepEqual(toggleProposalWindow([], day, 1410, 30, 90), [],
+  "A proposal cannot cross midnight.");
+assert.deepEqual(toggleProposalWindow([], day, 1350, 30, 90), [{ date: day, from: 1350, to: 1440 }]);
+assert.equal(proposalSelection([], day, 540, 30, 45), null);
+assert.equal(proposalSelection([], day, 540, 30, 1500), null);
+const longRange = { date: day, from: 540, to: 780 };
+const remainder = toggleProposalWindow([longRange], day, 630, 30, 90);
+assert.deepEqual(remainder, [{ date: day, from: 540, to: 630 }, { date: day, from: 720, to: 780 }]);
+assert(scheduleErrors(remainder, 30, 90).some(error => error.includes("90 minutos")),
+  "Short remainders are retained as an invalid draft; never silently removed.");
+assert.deepEqual(longRange, { date: day, from: 540, to: 780 }, "Selection must not mutate the draft.");
+assert.deepEqual(scheduleErrors([{ date: day, from: 540, to: 660 }], 30, 90), [],
+  "A 120-minute range can contain a 90-minute meeting; exact duration multiples are unnecessary.");
+assert(scheduleErrors([ninety], 30, 120).some(error => error.includes("120 minutos")),
+  "Increasing duration invalidates shorter proposals without extending them automatically.");
+assert.deepEqual(toggleProposalWindow([{ date: day, from: 540, to: 570 }], day, 540, 30, 90), [],
+  "An explicitly clicked short invalid draft may be removed.");
 const poll = {
   id: "p_test",
   title: "Test",
@@ -76,6 +105,7 @@ for (const step of [30, 60]) {
   const selected = new Set();
   for (let i = 0; i < 300; i++) {
     const time = ((i * 17) % (1440 / step)) * step;
+    assert.deepEqual(toggleProposalWindow(current, a.date, time, step, step), toggleBlock(current, a.date, time, step), "Single-block meetings preserve existing selection behavior.");
     current = toggleBlock(current, a.date, time, step);
     if (selected.has(time)) selected.delete(time);
     else selected.add(time);

@@ -18,6 +18,7 @@ import { SlotPeople } from "./slot-people";
 type Brush = Status | "erase";
 type Props = {
   slotKey: string;
+  selectionLabel?: string;
   compact: boolean;
   half?: boolean;
   poll: Poll;
@@ -38,6 +39,7 @@ type Props = {
 };
 export const CalendarSlot = memo(function CalendarSlot({
   slotKey: key,
+  selectionLabel,
   compact,
   half=false,
   poll,
@@ -84,7 +86,7 @@ export const CalendarSlot = memo(function CalendarSlot({
           }
           style={heatStyle(heatCount, heatMax)}
           disabled={disabled}
-          aria-label={`${slotLabel(poll, key)}: ${layer === "mine" ? (mine ? statuses[mine] : "Sin respuesta") : `${s.yes} disponibles, ${s.maybe} si hace falta, ${s.no} ocupados de ${votes.length}`}`}
+          aria-label={`${slotLabel(poll, key)}: ${layer === "mine" ? (mine ? statuses[mine] : "Sin respuesta") : `${s.yes} disponibles, ${s.maybe} si hace falta, ${s.no} ocupados de ${votes.length}`}${layer === "mine" && selectionLabel ? `. ${selectionLabel}` : ""}`}
           aria-pressed={layer === "mine" ? !!mine : undefined}
           aria-haspopup={layer === "group" ? "dialog" : undefined}
           onPointerDown={(e) => {

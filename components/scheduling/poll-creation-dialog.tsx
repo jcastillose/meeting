@@ -189,6 +189,32 @@ export function PollCreationDialog({
                 onChange={(e) => setForm({ ...form, title: e.target.value })}
               />
             </label>
+            <label className="field">
+              Duración de la reunión (minutos)
+              <input
+                type="number"
+                required
+                min={30}
+                step={30}
+                max={1440}
+                value={form.duration || form.step}
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    duration: Number(e.target.value),
+                    step: Number(e.target.value) % 60 === 30 ? 30 : form.step,
+                  })
+                }
+              />
+            </label>
+            <p className="small muted">
+              Puedes proponer reuniones desde 30 minutos, en incrementos de 30.
+              Cada propuesta debe cubrir al menos {duration} minutos continuos.
+              El calendario seleccionará esa duración con cada clic o toque.
+              {(!hourAligned || duration % 60 !== 0) && " Los horarios o duraciones a media hora requieren bloques de 30 minutos."}
+              {form.dailyRanges &&
+                " Cada día debe ofrecer al menos esa duración y sus horas deben coincidir con el tamaño de bloque."}
+            </p>
             <div className="field">
               <span>Tipo de consulta</span>
               <Choose
@@ -295,48 +321,16 @@ export function PollCreationDialog({
                     setForm({
                       ...form,
                       step: Number(v),
-                      duration:
-                        Math.ceil((form.duration || 60) / Number(v)) *
-                        Number(v),
                     })
                   }
                   options={
-                    hourAligned
+                    hourAligned && duration % 60 === 0
                       ? [["30", "30 minutos"], ["60", "60 minutos"]]
                       : [["30", "30 minutos"]]
                   }
                 />
               </div>
             </div>
-            <label className="field">
-              Duración de la reunión (minutos)
-              <input
-                type="number"
-                required
-                min={30}
-                step={30}
-                max={
-                  form.dailyRanges
-                    ? 1440
-                    : Math.max(form.step, form.to - form.from)
-                }
-                value={form.duration || form.step}
-                onChange={(e) =>
-                  setForm({
-                    ...form,
-                    duration: Number(e.target.value),
-                    step: Number(e.target.value) % 60 === 30 ? 30 : form.step,
-                  })
-                }
-              />
-            </label>
-            <p className="small muted">
-              Puedes proponer reuniones desde 30 minutos, en incrementos de 30.
-              Las coincidencias deben cubrir la duración completa de la reunión.
-              {!hourAligned && " Los horarios de media hora requieren bloques de 30 minutos."}
-              {form.dailyRanges &&
-                " Cada día debe ofrecer al menos esa duración y sus horas deben coincidir con el tamaño de bloque."}
-            </p>
             <label className="field">
               Zona horaria
               <input
