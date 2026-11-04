@@ -24,7 +24,7 @@ async function ownId(id:string,token:string){return Array.from(new Uint8Array(aw
 export default function Home(){
 const [poll,setPoll]=useState<Poll>(empty),[votes,setVotes]=useState<Vote[]>([]),[slots,setSlots]=useState<Record<string,Status>>({}),[name,setName]=useState(''),[comment,setComment]=useState(''),[email,setEmail]=useState(''),[managementLink,setManagementLink]=useState('');
 const [view,setView]=useState('week'),[layer,setLayer]=useState('mine'),[brush,setBrush]=useState<Brush>('yes'),[chosen,setChosen]=useState('w0');
-const [creating,setCreating]=useState(false),[form,setForm]=useState<Poll>({...empty,title:'Reunión de equipo',mode:'dates'}),[busy,setBusy]=useState(false),[loading,setLoading]=useState(false),[error,setError]=useState(''),[loadError,setLoadError]=useState(''),[myId,setMyId]=useState(''),[dirty,setDirty]=useState(false),[share,setShare]=useState(false),[shareUrl,setShareUrl]=useState(''),[lastSync,setLastSync]=useState('');
+const [creating,setCreating]=useState(false),[form,setForm]=useState<Poll>({...empty,title:'Reunión de equipo',mode:'dates',includeSaturdays:false,includeSundays:false}),[busy,setBusy]=useState(false),[loading,setLoading]=useState(false),[error,setError]=useState(''),[loadError,setLoadError]=useState(''),[myId,setMyId]=useState(''),[dirty,setDirty]=useState(false),[share,setShare]=useState(false),[shareUrl,setShareUrl]=useState(''),[lastSync,setLastSync]=useState('');
 const activeToken=useRef('');
 const [signedAccount,setSignedAccount]=useState<{email:string}|null>(null);
 useEffect(()=>{const controller=new AbortController();fetch('/api/admin/me',{signal:controller.signal,cache:'no-store'}).then(async r=>{if(r.ok)setSignedAccount(await r.json());}).catch(()=>{});return()=>controller.abort();},[]);

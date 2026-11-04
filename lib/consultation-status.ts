@@ -1,4 +1,4 @@
-import type {Poll} from './domain';
+import {days,type Poll} from './domain';
 
 export type ConsultationStatus = 'open' | 'expired' | 'closed';
 
@@ -15,7 +15,7 @@ function localDateAndMinute(now: Date, timezone: string) {
 export function consultationStatus(poll: Poll, now = new Date()): ConsultationStatus {
   if (poll.closed) return 'closed';
   if (poll.mode !== 'dates') return 'open';
-  const ranges = poll.dailyRanges?.length ? poll.dailyRanges : [{date: poll.end, to: poll.to}];
+  const ranges = poll.dailyRanges?.length ? poll.dailyRanges : [{date: days(poll).at(-1)||poll.end, to: poll.to}];
   const last = ranges.reduce((latest, range) =>
     range.date > latest.date || range.date === latest.date && range.to > latest.to ? range : latest,
   );
